@@ -99,6 +99,12 @@ Nội dung thu thập: hãng, model, serial, CPU, RAM + loại RAM, ổ cứng, 
 
 Không cần Administrator, không gửi dữ liệu ra ngoài. Xem hướng dẫn và các lệnh kiểm tra nhanh tại **`docs/thu-thap-cau-hinh.md`**.
 
+### Gửi công cụ sang máy người khác
+
+- **Chỉ 1 file:** gửi **`TaiVaChay.bat`** — [tải tại đây](https://github.com/alexnguyenhao/manager-device/releases/latest/download/TaiVaChay.bat). File tự tải bộ công cụ mới nhất rồi chạy (máy đích cần Internet lần đầu).
+- **Chép cả thư mục:** tải [ZIP công cụ](https://github.com/alexnguyenhao/manager-device/releases/latest/download/ManagerDevice-CongCu-ThuThap-CauHinh.zip), giải nén, chép cả thư mục `ManagerDevice-CongCu` sang máy đích rồi chạy `ThuThapCauHinh.bat`.
+- Nếu Windows chặn file tải về: chuột phải → **Properties** → tích **Unblock** → **OK**.
+
 ---
 
 ## Mẫu nhập thiết bị từ Excel

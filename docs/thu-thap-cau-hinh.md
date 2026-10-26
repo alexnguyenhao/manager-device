@@ -8,9 +8,33 @@ Có 3 cách, từ nhanh nhất đến đầy đủ nhất.
 
 Script đọc cấu hình máy đang chạy, xuất **CSV nhập thẳng vào phần mềm** và một báo cáo TXT để đọc nhanh.
 
+### Gửi sang máy khác — chọn 1 trong 3 cách
+
+**Cách A — Gửi duy nhất 1 file `TaiVaChay.bat`** (dễ nhất)
+
+1. Tải **`TaiVaChay.bat`**:
+   https://github.com/alexnguyenhao/manager-device/releases/latest/download/TaiVaChay.bat
+2. Gửi file này qua Zalo / email / USB cho máy đích.
+3. Nhấp đúp để chạy — file tự tải bộ công cụ mới nhất từ GitHub, chạy quét, rồi xoá file tạm.
+
+> Máy đích cần có Internet lần đầu. Nếu bị Windows chặn file tải về: chuột phải file → **Properties** → tích **Unblock** → **OK**.
+
+**Cách B — Tải ZIP rồi chép cả thư mục**
+
+1. Tải bộ công cụ:
+   https://github.com/alexnguyenhao/manager-device/releases/latest/download/ManagerDevice-CongCu-ThuThap-CauHinh.zip
+2. Giải nén, chép **cả thư mục `ManagerDevice-CongCu`** sang máy đích (USB, Zalo, Google Drive…).
+3. Nhấp đúp **`ThuThapCauHinh.bat`** trong thư mục đó.
+
+> Không chạy được nếu chỉ gửi mỗi `ThuThapCauHinh.bat`, vì file này cần `collect-device-info.ps1` nằm cùng thư mục.
+
+**Cách C — Không cần tải gì**
+
+Copy các lệnh PowerShell ở **Cách 2** bên dưới, dán vào PowerShell trên máy đích.
+
 ### Chạy
 
-1. Mở thư mục `tools`.
+1. Mở thư mục `tools` (hoặc thư mục đã giải nén).
 2. Nhấp đúp **`ThuThapCauHinh.bat`**.
 3. Kết quả nằm trên Desktop trong thư mục **`ManagerDevice-CauHinh`**:
    - `cau-hinh-thiet-bi_<TÊN MÁY>_<ngày>.csv` — nhập vào phần mềm.
