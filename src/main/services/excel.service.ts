@@ -769,6 +769,9 @@ export function buildImportTemplateWorkbook(): ExcelJS.Workbook {
   bullet('4. Kiểm tra kết quả nhập; sửa các dòng báo lỗi rồi nhập lại nếu cần.')
   bullet('Nếu danh mục hoặc bộ phận/vị trí/nhân viên thay đổi, hãy tải lại mẫu mới từ phần mềm để cập nhật dropdown.')
 
+  // Đưa sheet Hướng dẫn lên đầu để mở file là thấy ngay.
+  ;(guide as unknown as { orderNo: number }).orderNo = 0
+
   /* --------------------------- Ví dụ sheet (bỏ qua) ---------------------- */
   const exampleSheet = workbook.addWorksheet(SHEET_EXAMPLES)
   exampleSheet.state = 'hidden'
