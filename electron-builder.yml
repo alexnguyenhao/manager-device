@@ -1,0 +1,45 @@
+appId: com.managerdevice.app
+productName: Manager Device
+copyright: Copyright © 2026 Manager Device
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**/*
+  - build/icon.png
+  - package.json
+  - '!**/*.map'
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ManagerDevice-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Quản lý thiết bị
+  installerLanguages:
+    - vi_VN
+
+linux:
+  target:
+    - AppImage
+  category: Office
+  artifactName: ManagerDevice-${version}.${ext}
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.business
+
+npmRebuild: false

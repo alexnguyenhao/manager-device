@@ -1,0 +1,10 @@
+node_modules
+out
+out-test
+dist
+release
+.vite
+*.log
+.DS_Store
+Thumbs.db
+src/renderer/public/__unused__
