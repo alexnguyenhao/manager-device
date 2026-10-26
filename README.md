@@ -1,6 +1,9 @@
 # Manager Device
 
-Phần mềm quản lý thiết bị và tài sản CNTT chạy **hoàn toàn cục bộ** trên máy tính Windows. Ứng dụng giúp theo dõi toàn bộ vòng đời tài sản: tiếp nhận, cấu hình, cấp phát, bảo trì, kiểm kê, khấu hao và thanh lý — tất cả trong một giao diện tiếng Việt duy nhất.
+[![Release](https://img.shields.io/github/v/release/alexnguyenhao/manager-device?label=release)](https://github.com/alexnguyenhao/manager-device/releases/latest)
+[![Build](https://github.com/alexnguyenhao/manager-device/actions/workflows/build-release.yml/badge.svg)](https://github.com/alexnguyenhao/manager-device/actions/workflows/build-release.yml)
+
+Phần mềm quản lý thiết bị và tài sản CNTT chạy **hoàn toàn cục bộ** trên máy tính Windows/Linux. Ứng dụng giúp theo dõi toàn bộ vòng đời tài sản: tiếp nhận, cấu hình, cấp phát, bảo trì, kiểm kê, khấu hao và thanh lý — tất cả trong một giao diện tiếng Việt duy nhất.
 
 Dữ liệu được lưu trong SQLite tại thư mục người dùng, không gửi lên máy chủ và không cần kết nối Internet.
 
