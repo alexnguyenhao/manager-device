@@ -162,6 +162,8 @@ function seedCategories(): Record<string, number> {
       warranty: 36,
       specs: [
         { key: 'cpu', label: 'CPU', type: 'text', placeholder: 'Intel Core i5-12400' },
+        { key: 'cpuCores', label: 'Số nhân CPU', type: 'number', unit: 'nhân' },
+        { key: 'cpuThreads', label: 'Số luồng CPU', type: 'number', unit: 'luồng' },
         { key: 'ram', label: 'RAM', type: 'number', unit: 'GB' },
         {
           key: 'ramType',
@@ -169,8 +171,10 @@ function seedCategories(): Record<string, number> {
           type: 'select',
           options: ['DDR3', 'DDR4', 'DDR5']
         },
+        { key: 'ramBus', label: 'Bus RAM', type: 'number', unit: 'MHz' },
         { key: 'storage', label: 'Dung lượng ổ cứng', type: 'text', placeholder: 'SSD 512GB' },
         { key: 'gpu', label: 'Card đồ họa (GPU)', type: 'text', placeholder: 'Intel UHD 730' },
+        { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
         { key: 'monitor', label: 'Màn hình', type: 'text' },
         {
           key: 'os',
@@ -195,6 +199,8 @@ function seedCategories(): Record<string, number> {
       warranty: 24,
       specs: [
         { key: 'cpu', label: 'CPU', type: 'text', placeholder: 'Intel Core i7-1355U' },
+        { key: 'cpuCores', label: 'Số nhân CPU', type: 'number', unit: 'nhân' },
+        { key: 'cpuThreads', label: 'Số luồng CPU', type: 'number', unit: 'luồng' },
         { key: 'ram', label: 'RAM', type: 'number', unit: 'GB' },
         {
           key: 'ramType',
@@ -202,8 +208,10 @@ function seedCategories(): Record<string, number> {
           type: 'select',
           options: ['DDR4', 'DDR5', 'LPDDR4X', 'LPDDR5', 'LPDDR5X']
         },
+        { key: 'ramBus', label: 'Bus RAM', type: 'number', unit: 'MHz' },
         { key: 'storage', label: 'Dung lượng ổ cứng', type: 'text', placeholder: 'SSD 1TB' },
         { key: 'gpu', label: 'Card đồ họa (GPU)', type: 'text', placeholder: 'Intel Iris Xe' },
+        { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
         { key: 'screen', label: 'Kích thước màn hình', type: 'text', unit: 'inch' },
         {
           key: 'os',

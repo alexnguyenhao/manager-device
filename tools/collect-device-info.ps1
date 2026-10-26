@@ -113,6 +113,31 @@ function Get-PrinterTechnology([string]$Text, [string]$Color) {
     return ""
 }
 
+function Get-GpuMemoryLabel([string]$GpuName, [double]$AdapterRam) {
+    $isIntegrated = $GpuName -match "Intel.*(UHD|HD|Iris)|Iris|Radeon\(TM\) Graphics|Radeon Graphics|Vega \d|Apple M\d"
+    if ($GpuName -match "Intel.*Arc") { $isIntegrated = $false }
+    if ($isIntegrated) { return "Chia sẻ" }
+
+    $bytes = 0
+    try {
+        $classKey = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+        foreach ($key in @(Get-ChildItem -Path $classKey -ErrorAction SilentlyContinue)) {
+            $props = Get-ItemProperty -Path $key.PSPath -ErrorAction SilentlyContinue
+            if (-not $props -or -not $props.DriverDesc) { continue }
+            if ((Get-WmiText $props.DriverDesc) -ne $GpuName) { continue }
+            $qw = $props."HardwareInformation.qwMemorySize"
+            if ($qw) { $bytes = [double]$qw; break }
+        }
+    } catch { }
+
+    if ($bytes -le 0) { $bytes = $AdapterRam }
+    if ($bytes -le 0) { return "" }
+
+    $gb = $bytes / 1GB
+    if ($gb -ge 1) { return ([math]::Round($gb, 0).ToString() + "GB") }
+    return ([math]::Round($gb, 1).ToString() + "GB")
+}
+
 function Escape-Csv([object]$Value) {
     if ($null -eq $Value) { return "" }
     $text = ([string]$Value).Replace("`r", " ").Replace("`n", " ")
@@ -207,6 +232,13 @@ $cpuName = $cpuName -replace "\(R\)|\(TM\)", ""
 $cpuName = $cpuName -replace "\s+", " "
 $cpuName = $cpuName.Trim()
 
+$cpuCores = 0
+$cpuThreads = 0
+foreach ($proc in @(Get-CimInstance -ClassName Win32_Processor)) {
+    if ($proc.NumberOfCores) { $cpuCores += [int]$proc.NumberOfCores }
+    if ($proc.NumberOfLogicalProcessors) { $cpuThreads += [int]$proc.NumberOfLogicalProcessors }
+}
+
 $ramTotalGB = 0
 if ($cs.TotalPhysicalMemory) {
     $ramTotalGB = [int][math]::Round(([double]$cs.TotalPhysicalMemory / 1GB), 0)
@@ -221,14 +253,32 @@ foreach ($module in $ramModules) {
 }
 $ramType = Join-UniqueText $ramTypeNames " / "
 
+$ramBusValues = @()
+foreach ($module in $ramModules) {
+    $speed = 0
+    if ($module.ConfiguredClockSpeed) { $speed = [int]$module.ConfiguredClockSpeed }
+    elseif ($module.Speed) { $speed = [int]$module.Speed }
+    if ($speed -gt 0) { $ramBusValues += $speed }
+}
+$ramBus = 0
+if ($ramBusValues.Count -gt 0) {
+    $ramBus = [int]($ramBusValues | Measure-Object -Maximum).Maximum
+}
+
 $gpuNames = @()
+$gpuMemories = @()
 foreach ($gpu in @(Get-CimInstance -ClassName Win32_VideoController)) {
     $name = Get-WmiText $gpu.Name
     if ($name -and $name -notmatch "Remote|Basic Display|Virtual|Microsoft Hyper-V") {
         $gpuNames += $name
+        $adapterRam = 0
+        if ($gpu.AdapterRAM) { $adapterRam = [double]$gpu.AdapterRAM }
+        $memory = Get-GpuMemoryLabel $name $adapterRam
+        if ($memory) { $gpuMemories += $memory }
     }
 }
 $gpu = Join-UniqueText $gpuNames " + "
+$gpuMemory = Join-UniqueText $gpuMemories " + "
 
 $diskParts = @()
 $physicalDisks = @(Get-PhysicalDisk | Where-Object { $_.Size -gt 0 })
@@ -311,7 +361,7 @@ $computerNoteParts = @()
 $computerNoteParts += ("Tự động thu thập " + $now.ToString("dd/MM/yyyy HH:mm"))
 $computerNoteParts += ("Máy: " + $computerName)
 if ($ipText) { $computerNoteParts += ("IP: " + $ipText) }
-if ($cpuName) { $computerNoteParts += ("CPU: " + $cpuName) }
+if ($cpuName) { $computerNoteParts += ("CPU: " + $cpuName + $(if ($cpuCores -gt 0) { " (" + $cpuCores + " nhân / " + $cpuThreads + " luồng)" } else { "" })) }
 if ($ramModules.Count -gt 0) {
     $slotInfo = @()
     foreach ($module in $ramModules) {
@@ -350,10 +400,14 @@ $computerRow = [ordered]@{
     "Số hóa đơn"               = ""
     "Ghi chú"                  = $computerNote
     "CPU"                      = $cpuName
+    "Số nhân CPU"              = if ($cpuCores -gt 0) { $cpuCores.ToString($Invariant) } else { "" }
+    "Số luồng CPU"             = if ($cpuThreads -gt 0) { $cpuThreads.ToString($Invariant) } else { "" }
     "RAM (GB)"                 = if ($ramTotalGB -gt 0) { $ramTotalGB.ToString($Invariant) } else { "" }
     "Loại RAM"                 = $ramType
+    "Bus RAM"                  = if ($ramBus -gt 0) { $ramBus.ToString($Invariant) } else { "" }
     "Dung lượng ổ cứng"        = $storage
     "Card đồ họa (GPU)"        = $gpu
+    "Bộ nhớ GPU"               = $gpuMemory
     "Màn hình"                 = if ($isLaptop) { "" } else { $monitor }
     "Hệ điều hành"             = $osName
     "Bản quyền Windows"        = $license
@@ -371,10 +425,10 @@ $report.Add("LOẠI MÁY: " + $deviceType)
 $report.Add("Tên thiết bị: " + $displayName)
 $report.Add("Hãng / Model: " + $manufacturer + " / " + $model)
 $report.Add("Serial BIOS: " + $serial)
-$report.Add("CPU: " + $cpuName)
-$report.Add("RAM: " + $ramTotalGB + " GB" + $(if ($ramType) { " (" + $ramType + ")" } else { "" }))
+$report.Add("CPU: " + $cpuName + $(if ($cpuCores -gt 0) { " (" + $cpuCores + " nhân / " + $cpuThreads + " luồng)" } else { "" }))
+$report.Add("RAM: " + $ramTotalGB + " GB" + $(if ($ramType) { " (" + $ramType + ")" } else { "" }) + $(if ($ramBus -gt 0) { " - Bus " + $ramBus + " MHz" } else { "" }))
 $report.Add("Ổ cứng: " + $storage)
-$report.Add("GPU: " + $gpu)
+$report.Add("GPU: " + $gpu + $(if ($gpuMemory) { " (" + $gpuMemory + ")" } else { "" }))
 if ($monitor) { $report.Add("Màn hình: " + $monitor) }
 $report.Add("Hệ điều hành: " + $osCaption + " (" + $osVersion + "." + $osBuild + ")")
 $report.Add("Bản quyền Windows: " + $license)
@@ -382,10 +436,10 @@ $report.Add("IP: " + $ipText)
 $report.Add("")
 
 Write-Host ("  " + $deviceType + ": " + $displayName) -ForegroundColor Green
-Write-Host ("  CPU: " + $cpuName)
-Write-Host ("  RAM: " + $ramTotalGB + " GB " + $ramType)
+Write-Host ("  CPU: " + $cpuName + $(if ($cpuCores -gt 0) { "  (" + $cpuCores + " nhân / " + $cpuThreads + " luồng)" } else { "" }))
+Write-Host ("  RAM: " + $ramTotalGB + " GB " + $ramType + $(if ($ramBus -gt 0) { "  Bus " + $ramBus + " MHz" } else { "" }))
 Write-Host ("  Ổ cứng: " + $storage)
-Write-Host ("  GPU: " + $gpu)
+Write-Host ("  GPU: " + $gpu + $(if ($gpuMemory) { "  (" + $gpuMemory + ")" } else { "" }))
 Write-Host ("  OS: " + $osName + " " + $osVersion)
 
 # ---------------------------------------------------------------------------
@@ -514,10 +568,14 @@ if (-not $NoPrinters) {
                 "Số hóa đơn"               = ""
                 "Ghi chú"                  = $printerNote
                 "CPU"                      = ""
+                "Số nhân CPU"              = ""
+                "Số luồng CPU"             = ""
                 "RAM (GB)"                 = ""
                 "Loại RAM"                 = ""
+                "Bus RAM"                  = ""
                 "Dung lượng ổ cứng"        = ""
                 "Card đồ họa (GPU)"        = ""
+                "Bộ nhớ GPU"               = ""
                 "Màn hình"                 = ""
                 "Hệ điều hành"             = ""
                 "Bản quyền Windows"        = ""
@@ -552,8 +610,9 @@ $headers = @(
     "Mã thiết bị", "Tên thiết bị", "Danh mục", "Serial", "Model", "Hãng sản xuất",
     "Trạng thái", "Tình trạng", "Bộ phận", "Vị trí", "Người sử dụng", "Nhà cung cấp",
     "Ngày mua", "Giá mua", "Tháng bảo hành", "Tháng khấu hao", "Giá trị thanh lý",
-    "Số hóa đơn", "Ghi chú", "CPU", "RAM (GB)", "Loại RAM", "Dung lượng ổ cứng",
-    "Card đồ họa (GPU)", "Màn hình", "Hệ điều hành", "Bản quyền Windows",
+    "Số hóa đơn", "Ghi chú", "CPU", "Số nhân CPU", "Số luồng CPU", "RAM (GB)",
+    "Loại RAM", "Bus RAM", "Dung lượng ổ cứng", "Card đồ họa (GPU)", "Bộ nhớ GPU",
+    "Màn hình", "Hệ điều hành", "Bản quyền Windows",
     "Kích thước màn hình (inch)", "Khối lượng", "Công nghệ in", "Tốc độ in",
     "Độ phân giải", "Khổ giấy", "Kết nối", "In màu"
 )

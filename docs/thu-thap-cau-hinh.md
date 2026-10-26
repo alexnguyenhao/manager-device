@@ -47,7 +47,7 @@ Không cần quyền Administrator. Script chỉ đọc thông tin trên máy, *
 
 | Thiết bị | Thông tin |
 | --- | --- |
-| Máy tính để bàn | Hãng, model, serial BIOS, CPU, RAM + loại RAM, ổ cứng (SSD/HDD + dung lượng), GPU, màn hình, hệ điều hành, bản quyền Windows, IP |
+| Máy tính để bàn | Hãng, model, serial BIOS, CPU + số nhân/số luồng, RAM + loại RAM + bus, ổ cứng (SSD/HDD + dung lượng), GPU + bộ nhớ, màn hình, hệ điều hành, bản quyền Windows, IP |
 | Laptop | Như trên, tự nhận diện qua chassis/pin; bỏ trống kích thước màn hình và khối lượng để bạn tự điền |
 | Máy in | Tên, hãng, model, driver, cổng, độ phân giải, in màu, kết nối USB/LAN, trạng thái, máy in mặc định, IP (nếu có) |
 

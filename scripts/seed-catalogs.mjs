@@ -75,10 +75,14 @@ const CATEGORIES = [
     warranty: 36,
     specs: [
       { key: 'cpu', label: 'CPU', type: 'text', placeholder: 'Intel Core i5-12400' },
+      { key: 'cpuCores', label: 'Số nhân CPU', type: 'number', unit: 'nhân' },
+      { key: 'cpuThreads', label: 'Số luồng CPU', type: 'number', unit: 'luồng' },
       { key: 'ram', label: 'RAM', type: 'number', unit: 'GB' },
       { key: 'ramType', label: 'Loại RAM', type: 'select', options: ['DDR3', 'DDR4', 'DDR5'] },
+      { key: 'ramBus', label: 'Bus RAM', type: 'number', unit: 'MHz' },
       { key: 'storage', label: 'Dung lượng ổ cứng', type: 'text', placeholder: 'SSD 512GB' },
       { key: 'gpu', label: 'Card đồ họa (GPU)', type: 'text', placeholder: 'Intel UHD 730' },
+      { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
       { key: 'monitor', label: 'Màn hình', type: 'text' },
       {
         key: 'os',
@@ -110,6 +114,8 @@ const CATEGORIES = [
     warranty: 24,
     specs: [
       { key: 'cpu', label: 'CPU', type: 'text', placeholder: 'Intel Core i7-1355U' },
+      { key: 'cpuCores', label: 'Số nhân CPU', type: 'number', unit: 'nhân' },
+      { key: 'cpuThreads', label: 'Số luồng CPU', type: 'number', unit: 'luồng' },
       { key: 'ram', label: 'RAM', type: 'number', unit: 'GB' },
       {
         key: 'ramType',
@@ -117,8 +123,10 @@ const CATEGORIES = [
         type: 'select',
         options: ['DDR4', 'DDR5', 'LPDDR4X', 'LPDDR5', 'LPDDR5X']
       },
+      { key: 'ramBus', label: 'Bus RAM', type: 'number', unit: 'MHz' },
       { key: 'storage', label: 'Dung lượng ổ cứng', type: 'text', placeholder: 'SSD 1TB' },
       { key: 'gpu', label: 'Card đồ họa (GPU)', type: 'text', placeholder: 'Intel Iris Xe' },
+      { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
       { key: 'screen', label: 'Kích thước màn hình', type: 'text', unit: 'inch' },
       {
         key: 'os',
@@ -289,6 +297,24 @@ const db = new DatabaseSync(dbPath)
 db.exec('PRAGMA foreign_keys = ON')
 db.exec('PRAGMA busy_timeout = 5000')
 
+/** Vị trí chèn trường mới để giữ thứ tự hiển thị hợp lý. */
+const FIELD_ANCHORS = {
+  cpuCores: 'cpu',
+  cpuThreads: 'cpuCores',
+  ramBus: 'ramType',
+  gpuMemory: 'gpu'
+}
+
+function findInsertIndex(schema, key) {
+  const anchor = FIELD_ANCHORS[key]
+  const index = anchor ? schema.findIndex((field) => field && field.key === anchor) : -1
+  return index >= 0 ? index + 1 : schema.length
+}
+
+function recordsLabel(row) {
+  return `${row.code} - ${row.name}`
+}
+
 try {
   const userCount = Number(
     (db.prepare('SELECT COUNT(*) AS count FROM users').get() || { count: 0 }).count
@@ -310,6 +336,10 @@ try {
 
   const findByCode = db.prepare('SELECT id, code, name FROM categories WHERE code = ?')
   const findByName = db.prepare('SELECT id, code, name FROM categories WHERE name = ?')
+  const findSchema = db.prepare('SELECT id, code, name, spec_schema FROM categories WHERE code = ? OR name = ?')
+  const updateSchema = db.prepare(
+    'UPDATE categories SET spec_schema = ?, updated_at = ? WHERE id = ?'
+  )
   const insert = db.prepare(
     `INSERT INTO categories
        (code, name, prefix, description, spec_schema, default_depreciation_months, default_warranty_months, is_active, created_at, updated_at)
@@ -319,6 +349,7 @@ try {
   const now = new Date().toISOString()
   let added = 0
   let skipped = 0
+  let upgraded = 0
 
   db.exec('BEGIN')
   try {
@@ -326,7 +357,32 @@ try {
       const existing = findByCode.get(row.code) || findByName.get(row.name)
       if (existing) {
         skipped += 1
-        console.log(`- Bỏ qua: ${row.code} - ${row.name} (đã có: ${existing.code})`)
+        const record = findSchema.get(row.code, row.name)
+        let schema = []
+        try {
+          schema = JSON.parse(record?.spec_schema || '[]')
+        } catch {
+          schema = []
+        }
+        if (!Array.isArray(schema)) schema = []
+
+        const knownKeys = new Set(schema.map((field) => field && field.key))
+        const missing = row.specs.filter((field) => !knownKeys.has(field.key))
+        if (missing.length > 0) {
+          const merged = [...schema]
+          for (const field of missing) {
+            merged.splice(findInsertIndex(merged, field.key), 0, field)
+          }
+          updateSchema.run(JSON.stringify(merged), now, existing.id)
+          upgraded += 1
+          console.log(
+            `- Bổ sung ${missing.length} trường thông số: ${recordsLabel(row)} (${missing
+              .map((field) => field.label)
+              .join(', ')})`
+          )
+        } else {
+          console.log(`- Bỏ qua: ${recordsLabel(row)} (đã có đủ trường)`)
+        }
         continue
       }
       insert.run(
@@ -351,7 +407,9 @@ try {
 
   const total = Number(db.prepare('SELECT COUNT(*) AS count FROM categories').get().count)
   console.log('')
-  console.log(`Hoàn tất: thêm ${added}, bỏ qua ${skipped}. Tổng số danh mục: ${total}.`)
+  console.log(
+    `Hoàn tất: thêm ${added}, bổ sung thông số ${upgraded}, bỏ qua ${skipped}. Tổng số danh mục: ${total}.`
+  )
 } finally {
   db.close()
 }

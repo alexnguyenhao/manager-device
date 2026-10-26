@@ -95,7 +95,7 @@ Chạy **`tools/ThuThapCauHinh.bat`** trên máy Windows cần kiểm tra. Scrip
 - **CSV** nhập thẳng vào phần mềm (Thiết bị → Nhập Excel).
 - **TXT** báo cáo chi tiết để đọc/đối chiếu.
 
-Nội dung thu thập: hãng, model, serial, CPU, RAM + loại RAM, ổ cứng, GPU, màn hình, hệ điều hành, bản quyền Windows, IP; với máy in: tên, driver, cổng, độ phân giải, in màu, kết nối, trạng thái, máy in mặc định. Máy in ảo (Fax, PDF, XPS, OneNote…) tự động bị bỏ qua.
+Nội dung thu thập: hãng, model, serial, CPU + số nhân/số luồng, RAM + loại RAM + bus, ổ cứng, GPU + bộ nhớ, màn hình, hệ điều hành, bản quyền Windows, IP; với máy in: tên, driver, cổng, độ phân giải, in màu, kết nối, trạng thái, máy in mặc định. Máy in ảo (Fax, PDF, XPS, OneNote…) tự động bị bỏ qua.
 
 Không cần Administrator, không gửi dữ liệu ra ngoài. Xem hướng dẫn và các lệnh kiểm tra nhanh tại **`docs/thu-thap-cau-hinh.md`**.
 
