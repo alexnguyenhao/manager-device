@@ -116,6 +116,8 @@ Lệnh tải `scan.txt` về bộ nhớ rồi chạy nên **không tạo tệp `
 
 Xem chi tiết và giới hạn tại **`web-tool/README.md`**.
 
+> Lần đầu triển khai cần bật Pages một lần: **Settings → Pages → Build and deployment → Source: GitHub Actions**, sau đó chạy lại workflow **Deploy web tool**. Nếu chưa bật, workflow sẽ báo lỗi ở bước *Setup Pages*.
+
 ### Cách 2 — Quét ngay trong Manager Device (khi máy đã cài ứng dụng)
 
 Mở **Thiết bị** → **Quét máy này** (hoặc nút **Quét máy này** trong biểu mẫu thêm thiết bị). Ứng dụng sẽ:
