@@ -1,12 +1,29 @@
 # Thu thập cấu hình máy tính, laptop và máy in
 
-Có 3 cách, từ nhanh nhất đến đầy đủ nhất.
+Có 4 cách, từ nhanh nhất đến đầy đủ nhất.
 
-> **Khuyến nghị khi Smart App Control đang bật:** dùng **Thiết bị → Quét máy này** ngay trong Manager Device. Ứng dụng chạy script qua `powershell.exe` có sẵn trong bộ nhớ, không tạo tệp `.bat`/`.ps1` nên không bị chặn với lỗi *“dangerous file extension”*. Các cách bên dưới chỉ dùng khi máy đích không cài Manager Device và chính sách bảo mật cho phép chạy script.
+> **Nếu Smart App Control đang bật:** đừng chạy tệp `.bat`. Dùng **web tool** hoặc nút **Quét máy này** trong Manager Device — cả hai đều chạy script qua `powershell.exe` có sẵn trong bộ nhớ, không tạo tệp `.bat`/`.ps1` nên không bị chặn với lỗi *“dangerous file extension”*. Không nên tắt Smart App Control chỉ để chạy công cụ.
 
 ---
 
-## Cách 1 — Chạy script CSV tự động (dự phòng)
+## Cách 1 — Web tool, máy khác không cần cài đặt (khuyến nghị)
+
+Mở **<https://alexnguyenhao.github.io/manager-device/>** trên máy cần quét:
+
+1. Bấm **Sao chép lệnh**.
+2. Nhấn **Win + X** → **Terminal** (hoặc PowerShell) → **Ctrl + V** → **Enter**.
+3. Script quét khoảng 3 giây, in mã `MD1:…`, copy vào clipboard và mở sẵn trang kèm kết quả.
+4. Kiểm tra bảng cấu hình, sửa tên/danh mục nếu cần rồi bấm **Thêm vào danh sách**.
+5. Làm lần lượt trên từng máy (dán nhiều mã cùng lúc cũng được), sau đó **Xuất CSV**.
+6. Trong Manager Device: **Thiết bị → Nhập Excel → chọn tệp CSV**.
+
+Không cần cài phần mềm, không cần Administrator, không tạo tệp thực thi. Dữ liệu chỉ nằm trong trình duyệt, không có máy chủ nhận dữ liệu.
+
+> Cột thông số trong CSV dùng đúng khóa của danh mục (`cpu`, `ram (GB)`, `storage`, `monitor`, `screen (inch)`…), không đổi tên cột để nhập được trực tiếp. Chi tiết: **`web-tool/README.md`**.
+
+---
+
+## Cách 2 — Chạy script CSV tự động (dự phòng)
 
 Script đọc cấu hình máy đang chạy, xuất **CSV nhập thẳng vào phần mềm** và một báo cáo TXT để đọc nhanh.
 
@@ -22,7 +39,7 @@ Script đọc cấu hình máy đang chạy, xuất **CSV nhập thẳng vào ph
 
 **Cách B — Không cần chép file**
 
-Copy các lệnh PowerShell ở **Cách 2** bên dưới, dán vào PowerShell trên máy đích.
+Copy các lệnh PowerShell ở **Cách 3** bên dưới, dán vào PowerShell trên máy đích.
 
 ### Chạy
 
@@ -73,7 +90,7 @@ powershell ... -File .\collect-device-info.ps1 `
 
 ---
 
-## Cách 2 — Lệnh nhanh, không cần file
+## Cách 3 — Lệnh nhanh, không cần file
 
 Mở **PowerShell** trên máy cần kiểm tra (Windows + X → Terminal/PowerShell) và dán:
 
@@ -124,7 +141,7 @@ slmgr /xpr
 
 ---
 
-## Cách 3 — Quét từ xa qua mạng (nâng cao)
+## Cách 4 — Quét từ xa qua mạng (nâng cao)
 
 Máy quét cần bật **WinRM/PowerShell Remoting** và tài khoản có quyền admin trên máy đích.
 

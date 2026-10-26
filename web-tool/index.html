@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="Quét cấu hình máy tính không cần cài đặt, gom nhiều máy và xuất CSV nhập vào Manager Device."
+    />
+    <title>Thu thập cấu hình máy · Manager Device</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M9 22V10h3.2l3.8 6.4L19.8 10H23v12h-2.6v-7.8L16.6 20h-1.2l-3.8-5.8V22H9Z' fill='white'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap hero-inner">
+        <div class="hero-badge">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.3-2.9 7.6-7 9.5-4.1-1.9-7-5.2-7-9.5V6l7-3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Không cài đặt · Không cần Administrator
+        </div>
+        <h1>Thu thập cấu hình máy tính</h1>
+        <p class="hero-sub">
+          Chạy một lệnh PowerShell trên máy cần kiểm tra, dán kết quả vào đây rồi xuất CSV
+          nhập thẳng vào Manager Device. Dữ liệu chỉ nằm trên máy của bạn.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="card steps" aria-label="Ba bước thực hiện">
+        <div class="step">
+          <span class="step-num">1</span>
+          <div>
+            <h2>Sao chép lệnh</h2>
+            <p>Bấm nút bên dưới để copy lệnh quét.</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <div>
+            <h2>Chạy trên máy cần quét</h2>
+            <p>Nhấn <kbd>Win</kbd> + <kbd>X</kbd> → <b>Terminal</b> (hoặc PowerShell) → <kbd>Ctrl</kbd> + <kbd>V</kbd> → <kbd>Enter</kbd>.</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <div>
+            <h2>Dán kết quả &amp; xuất CSV</h2>
+            <p>Trang tự mở kèm kết quả. Bấm <b>Thêm vào danh sách</b>, gom đủ máy rồi xuất CSV.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>Lệnh quét</h2>
+            <p class="muted">
+              Lệnh tải script quét dạng văn bản về bộ nhớ rồi chạy, <b>không ghi tệp</b>
+              <code>.bat</code>/<code>.ps1</code> nên không bị Smart App Control chặn.
+            </p>
+          </div>
+          <button id="copy-command" class="btn btn-primary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            Sao chép lệnh
+          </button>
+        </div>
+        <pre id="command-box" class="code" tabindex="0"><code></code></pre>
+        <div id="command-warning" class="alert alert-warn" hidden>
+          Trang đang mở trực tiếp từ tệp (<code>file://</code>). Hãy chạy qua địa chỉ
+          <code>http(s)</code> để lệnh tải được script quét.
+        </div>
+
+        <details class="fallback">
+          <summary>Máy chặn tải script? Dùng bản dán trực tiếp (không cần Internet)</summary>
+          <p class="muted small">
+            Bản này nhúng toàn bộ script vào một dòng lệnh, dài hơn nhưng không cần tải gì thêm.
+          </p>
+          <button id="copy-inline" class="btn btn-ghost btn-sm" type="button">Sao chép bản đầy đủ</button>
+          <div id="inline-status" class="muted small" aria-live="polite"></div>
+        </details>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>Dán kết quả</h2>
+            <p class="muted">Dán mã <code>MD1:…</code> hoặc toàn bộ nội dung PowerShell vừa in ra.</p>
+          </div>
+        </div>
+        <label class="sr-only" for="paste-input">Mã kết quả quét</label>
+        <textarea
+          id="paste-input"
+          class="textarea"
+          rows="3"
+          spellcheck="false"
+          placeholder="MD1:eyJjb21wdXRlck5hbWUiOi..."
+        ></textarea>
+        <div class="row">
+          <button id="analyze" class="btn btn-primary" type="button">Phân tích</button>
+          <span id="paste-hint" class="muted small">
+            Hỗ trợ dán nhiều mã một lúc (mỗi mã một dòng) để thêm hàng loạt.
+          </span>
+        </div>
+        <div id="paste-error" class="alert alert-error" hidden></div>
+      </section>
+
+      <section id="preview" class="card preview" hidden aria-live="polite">
+        <div class="card-head">
+          <div>
+            <div class="pill-row">
+              <span id="preview-type" class="pill">Máy tính để bàn</span>
+              <span id="preview-host" class="pill pill-mono"></span>
+              <span id="preview-time" class="muted small"></span>
+            </div>
+            <h2 class="preview-title">Kết quả quét</h2>
+          </div>
+          <button id="discard-preview" class="btn btn-ghost btn-sm" type="button">Bỏ qua</button>
+        </div>
+
+        <div id="preview-specs" class="spec-grid"></div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="edit-name">Tên thiết bị</label>
+            <input id="edit-name" class="input" type="text" maxlength="200" />
+          </div>
+          <div class="field">
+            <label for="edit-category">Danh mục</label>
+            <select id="edit-category" class="input">
+              <option value="Máy tính để bàn">Máy tính để bàn</option>
+              <option value="Laptop">Laptop</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="edit-serial">Serial</label>
+            <input id="edit-serial" class="input" type="text" maxlength="100" />
+          </div>
+          <div class="field">
+            <label for="edit-note">Ghi chú</label>
+            <input id="edit-note" class="input" type="text" />
+          </div>
+        </div>
+
+        <details class="fallback">
+          <summary>Thông tin bổ sung (tùy chọn)</summary>
+          <p class="muted small">
+            Chỉ điền nếu đã có sẵn trong phần mềm. Tên phòng ban / nhân viên phải khớp đúng
+            mã hoặc tên, nếu không dòng đó sẽ bị bỏ qua khi nhập.
+          </p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="edit-department">Phòng ban</label>
+              <input id="edit-department" class="input" type="text" placeholder="VD: Phòng Văn hóa - Xã hội" />
+            </div>
+            <div class="field">
+              <label for="edit-employee">Người sử dụng</label>
+              <input id="edit-employee" class="input" type="text" placeholder="VD: Nguyễn Văn A" />
+            </div>
+          </div>
+        </details>
+
+        <div class="row row-end">
+          <button id="add-entry" class="btn btn-primary" type="button">Thêm vào danh sách</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>Danh sách đã thu thập <span id="count" class="count">0</span></h2>
+            <p class="muted">Lưu trong trình duyệt này. Xuất CSV khi đã gom đủ máy.</p>
+          </div>
+          <div class="row row-tight">
+            <button id="export-csv" class="btn btn-primary" type="button">Xuất CSV</button>
+            <button id="backup-json" class="btn btn-ghost btn-sm" type="button">Sao lưu</button>
+            <button id="restore-json" class="btn btn-ghost btn-sm" type="button">Nạp</button>
+            <button id="clear-all" class="btn btn-ghost btn-sm btn-danger" type="button">Xóa hết</button>
+            <input id="restore-file" type="file" accept="application/json,.json" hidden />
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="entry-table">
+            <thead>
+              <tr>
+                <th class="col-index">#</th>
+                <th>Tên thiết bị</th>
+                <th class="col-cat">Danh mục</th>
+                <th class="col-cpu">CPU</th>
+                <th class="col-ram">RAM</th>
+                <th class="col-disk">Ổ cứng</th>
+                <th class="col-serial">Serial</th>
+                <th class="col-time">Quét lúc</th>
+                <th class="col-actions"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="empty-state" class="empty">Chưa có máy nào. Hãy làm theo 3 bước ở trên.</p>
+      </section>
+
+      <section class="card notes">
+        <h2>Lưu ý khi dùng</h2>
+        <ul>
+          <li>Trình duyệt <b>không đọc được</b> phần cứng, nên bước chạy PowerShell là bắt buộc. Lệnh chỉ đọc thông tin, không thay đổi gì trên máy.</li>
+          <li>Kết quả quét được copy vào clipboard và mở sẵn trên trang này; nếu trình duyệt không tự mở, dán mã vào ô phía trên.</li>
+          <li>Xuất CSV rồi vào Manager Device → <b>Thiết bị</b> → <b>Nhập Excel</b> → chọn tệp CSV. Danh mục <b>Máy tính để bàn</b> và <b>Laptop</b> phải đang hoạt động.</li>
+          <li>Mã thiết bị để trống để phần mềm tự sinh theo danh mục. Trạng thái để trống để không bắt buộc phải có người sử dụng.</li>
+          <li>Dữ liệu chỉ lưu trong trình duyệt của bạn (localStorage). Không có máy chủ nào nhận dữ liệu.</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap">
+        <span>Manager Device · Công cụ thu thập cấu hình</span>
+        <span class="muted small">Không gửi dữ liệu ra ngoài · Chạy hoàn toàn cục bộ</span>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,346 @@
+param([string]$Page = '')
+
+# ============================================================================
+#  Manager Device - may quet cau hinh (web tool)
+#  Chay trong bo nho, khong tao tep .bat/.ps1, khong can Administrator.
+#  Ket qua: mot ma MD1:... (base64url JSON), dong thoi copy vao clipboard.
+# ============================================================================
+
+$ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+
+function T($value) {
+    if ($null -eq $value) { return '' }
+    return (([string]$value) -replace '\s+', ' ').Trim()
+}
+
+function JoinU($values, $separator) {
+    $seen = New-Object System.Collections.Generic.HashSet[string]
+    $list = New-Object System.Collections.Generic.List[string]
+    foreach ($item in @($values)) {
+        $text = T $item
+        if (-not $text) { continue }
+        if ($seen.Add($text)) { $list.Add($text) }
+    }
+    return ($list -join $separator)
+}
+
+function Get-RamTypeName($code) {
+    $value = 0
+    if ($code) { $value = [int]$code }
+    switch ($value) {
+        20 { return 'DDR' }
+        21 { return 'DDR2' }
+        22 { return 'DDR2' }
+        24 { return 'DDR3' }
+        26 { return 'DDR4' }
+        27 { return 'LPDDR' }
+        28 { return 'LPDDR2' }
+        29 { return 'LPDDR3' }
+        30 { return 'LPDDR4' }
+        31 { return 'LPDDR4X' }
+        34 { return 'DDR5' }
+        35 { return 'LPDDR5' }
+        default { return '' }
+    }
+}
+
+function Get-OsName($caption) {
+    if (-not $caption) { return 'Khac' }
+    if ($caption -match 'Windows 11 Pro') { return 'Windows 11 Pro' }
+    if ($caption -match 'Windows 11 Home') { return 'Windows 11 Home' }
+    if ($caption -match 'Windows 10 Pro') { return 'Windows 10 Pro' }
+    if ($caption -match 'Windows 10 Home') { return 'Windows 10 Home' }
+    if ($caption -match 'Ubuntu') { return 'Ubuntu' }
+    if ($caption -match 'macOS|Mac OS') { return 'macOS' }
+    return 'Khac'
+}
+
+function Get-GpuMemoryLabel($name, $adapterRam) {
+    $isIntegrated = $false
+    if ($name -match 'Intel.*(UHD|HD|Iris)|Iris|Radeon\(TM\) Graphics|Radeon Graphics|Vega \d|Apple M\d') {
+        $isIntegrated = $true
+    }
+    if ($name -match 'Intel.*Arc') { $isIntegrated = $false }
+    if ($isIntegrated) { return 'Chia se' }
+
+    $bytes = 0
+    try {
+        $classKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}'
+        foreach ($key in @(Get-ChildItem -Path $classKey -ErrorAction SilentlyContinue)) {
+            $props = Get-ItemProperty -Path $key.PSPath -ErrorAction SilentlyContinue
+            if (-not $props -or -not $props.DriverDesc) { continue }
+            if ((T $props.DriverDesc) -ne $name) { continue }
+            $qw = $props.'HardwareInformation.qwMemorySize'
+            if ($qw) { $bytes = [double]$qw; break }
+        }
+    } catch { }
+
+    if ($bytes -le 0) { $bytes = [double]$adapterRam }
+    if ($bytes -le 0) { return '' }
+    if ($bytes -gt 137438953472) { return '' }
+
+    $gb = $bytes / 1GB
+    if ($gb -ge 1) {
+        return ([math]::Round($gb, 0).ToString([System.Globalization.CultureInfo]::InvariantCulture) + 'GB')
+    }
+    return ([math]::Round($gb, 1).ToString([System.Globalization.CultureInfo]::InvariantCulture) + 'GB')
+}
+
+function Convert-WmiId($bytes) {
+    if ($null -eq $bytes) { return '' }
+    $chars = New-Object System.Collections.Generic.List[char]
+    foreach ($b in @($bytes)) {
+        if ($b -ne 0) { $chars.Add([char]$b) }
+    }
+    return (-join $chars).Trim()
+}
+
+$computerName = T $env:COMPUTERNAME
+$cs = Get-CimInstance -ClassName Win32_ComputerSystem
+$bios = Get-CimInstance -ClassName Win32_BIOS
+$product = Get-CimInstance -ClassName Win32_ComputerSystemProduct
+$os = Get-CimInstance -ClassName Win32_OperatingSystem
+$processors = @(Get-CimInstance -ClassName Win32_Processor)
+$cpu = $processors | Select-Object -First 1
+$ramModules = @(Get-CimInstance -ClassName Win32_PhysicalMemory)
+
+$manufacturer = T $cs.Manufacturer
+$model = T $cs.Model
+$serial = T $bios.SerialNumber
+if (-not $serial -or $serial -match 'To be filled|O\.E\.M|Default string|None|System Serial Number|Not Applicable|^0+$') {
+    $altSerial = T $product.IdentifyingNumber
+    if ($altSerial -and $altSerial -notmatch 'To be filled|O\.E\.M|Default string|None|System Serial Number|Not Applicable|^0+$') {
+        $serial = $altSerial
+    } else {
+        $serial = ''
+    }
+}
+if ($manufacturer -match 'System manufacturer|To Be Filled|Default string|OEM') { $manufacturer = '' }
+if ($model -match 'System Product Name|To Be Filled|Default string|All Series|System Version|Not Applicable') { $model = '' }
+
+$chassisTypes = @((Get-CimInstance -ClassName Win32_SystemEnclosure).ChassisTypes)
+$hasBattery = @(Get-CimInstance -ClassName Win32_Battery).Count -gt 0
+$isLaptop = $hasBattery
+foreach ($chassis in $chassisTypes) {
+    if ([int]$chassis -in @(8, 9, 10, 14, 30, 31, 32)) { $isLaptop = $true }
+}
+
+$cpuName = T $cpu.Name
+$cpuName = $cpuName -replace '\(R\)|\(TM\)', ''
+$cpuName = T $cpuName
+
+$cpuCores = 0
+$cpuThreads = 0
+foreach ($processor in $processors) {
+    if ($processor.NumberOfCores) { $cpuCores += [int]$processor.NumberOfCores }
+    if ($processor.NumberOfLogicalProcessors) { $cpuThreads += [int]$processor.NumberOfLogicalProcessors }
+}
+
+$ramBytes = 0
+foreach ($module in $ramModules) {
+    if ($module.Capacity) { $ramBytes += [double]$module.Capacity }
+}
+if ($ramBytes -le 0 -and $cs.TotalPhysicalMemory) {
+    $ramBytes = [double]$cs.TotalPhysicalMemory
+}
+$ramGB = 0
+if ($ramBytes -gt 0) { $ramGB = [int][math]::Round($ramBytes / 1GB) }
+
+$ramTypes = @()
+foreach ($module in $ramModules) {
+    $typeCode = 0
+    if ($module.SMBIOSMemoryType) { $typeCode = [int]$module.SMBIOSMemoryType }
+    elseif ($module.MemoryType) { $typeCode = [int]$module.MemoryType }
+    if ($typeCode -gt 0) {
+        $typeName = Get-RamTypeName $typeCode
+        if ($typeName) { $ramTypes += $typeName }
+    }
+}
+$ramType = JoinU $ramTypes ' / '
+
+$busValues = @()
+foreach ($module in $ramModules) {
+    $speed = 0
+    if ($module.ConfiguredClockSpeed) { $speed = [int]$module.ConfiguredClockSpeed }
+    elseif ($module.Speed) { $speed = [int]$module.Speed }
+    if ($speed -gt 0) { $busValues += $speed }
+}
+$ramBus = 0
+if ($busValues.Count -gt 0) {
+    $ramBus = [int]($busValues | Measure-Object -Maximum).Maximum
+}
+
+$slotParts = @()
+foreach ($module in $ramModules) {
+    $capacity = 0
+    if ($module.Capacity) { $capacity = [int][math]::Round([double]$module.Capacity / 1GB) }
+    if ($capacity -le 0) { continue }
+    $slot = T $module.DeviceLocator
+    if ($slot) { $slotParts += ($slot + ' ' + $capacity + 'GB') }
+    else { $slotParts += ($capacity.ToString() + 'GB') }
+}
+$ramSlots = $slotParts -join ', '
+
+$gpuNames = @()
+$gpuMemories = @()
+foreach ($gpu in @(Get-CimInstance -ClassName Win32_VideoController)) {
+    $name = T $gpu.Name
+    if (-not $name) { continue }
+    if ($name -match 'Remote|Basic Display|Virtual|Microsoft Hyper-V') { continue }
+    $gpuNames += $name
+    $memory = Get-GpuMemoryLabel $name ([double]$gpu.AdapterRAM)
+    if ($memory) { $gpuMemories += $memory }
+}
+$gpu = JoinU $gpuNames ' + '
+$gpuMemory = JoinU $gpuMemories ' + '
+
+$diskParts = @()
+$physicalDisks = @(Get-CimInstance -Namespace 'root\Microsoft\Windows\Storage' -ClassName MSFT_PhysicalDisk | Where-Object { $_.Size -gt 0 -and $_.BusType -ne 7 })
+if ($physicalDisks.Count -gt 0) {
+    foreach ($disk in $physicalDisks) {
+        $sizeGB = [int][math]::Round([double]$disk.Size / 1e9)
+        if ($sizeGB -le 0) { continue }
+        $media = ''
+        if ([int]$disk.MediaType -eq 3) { $media = 'HDD' }
+        elseif ([int]$disk.MediaType -eq 4) { $media = 'SSD' }
+        $bus = ''
+        if ([int]$disk.BusType -eq 17) { $bus = 'NVMe' }
+        elseif ([int]$disk.BusType -eq 11 -or [int]$disk.BusType -eq 3) { $bus = 'SATA' }
+        $label = JoinU (@($media, $bus)) ' '
+        $diskParts += (($label + ' ' + $sizeGB + 'GB').Trim())
+    }
+} else {
+    foreach ($disk in @(Get-CimInstance -ClassName Win32_DiskDrive)) {
+        if (-not $disk.Size) { continue }
+        $sizeGB = [int][math]::Round([double]$disk.Size / 1e9)
+        if ($sizeGB -le 0) { continue }
+        $media = ''
+        if ((T $disk.MediaType) -match 'SSD') { $media = 'SSD' }
+        $bus = T $disk.InterfaceType
+        if ($bus -notmatch 'NVMe|SATA|SCSI|IDE') { $bus = '' }
+        if ($bus -eq 'IDE') { $bus = 'SATA' }
+        $label = JoinU (@($media, $bus)) ' '
+        $diskParts += (($label + ' ' + $sizeGB + 'GB').Trim())
+    }
+}
+$storage = JoinU $diskParts ' + '
+
+$monitorNames = @()
+foreach ($monitor in @(Get-CimInstance -Namespace 'root\wmi' -ClassName WmiMonitorID)) {
+    $name = Convert-WmiId $monitor.UserFriendlyName
+    if ($name) { $monitorNames += $name }
+}
+$monitor = JoinU $monitorNames ' + '
+
+$screenSize = 0
+foreach ($display in @(Get-CimInstance -Namespace 'root\wmi' -ClassName WmiMonitorBasicDisplayParams)) {
+    $width = [double]$display.MaxHorizontalImageSize
+    $height = [double]$display.MaxVerticalImageSize
+    if ($width -le 0 -or $height -le 0) { continue }
+    $inch = [math]::Round(([math]::Sqrt($width * $width + $height * $height) / 2.54), 1)
+    if ($inch -lt 8 -or $inch -gt 40) { continue }
+    if ($screenSize -eq 0 -or $inch -lt $screenSize) { $screenSize = $inch }
+}
+
+$osCaption = T $os.Caption
+$osName = Get-OsName $osCaption
+$osVersion = T $os.Version
+$osBuild = T $os.BuildNumber
+
+$license = 'unknown'
+$licenses = @(Get-CimInstance -Query "SELECT Name,LicenseStatus FROM SoftwareLicensingProduct WHERE PartialProductKey IS NOT NULL AND Name LIKE 'Windows%'")
+if ($licenses.Count -gt 0) {
+    $licensed = @($licenses | Where-Object { $_.LicenseStatus -eq 1 })
+    if ($licensed.Count -gt 0) { $license = 'licensed' }
+    else { $license = 'unlicensed' }
+}
+
+$ipAddresses = @()
+try {
+    foreach ($adapter in @([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces())) {
+        if ($adapter.OperationalStatus -ne 'Up') { continue }
+        if ($adapter.NetworkInterfaceType -eq 'Loopback') { continue }
+        $adapterText = (T $adapter.Name) + ' ' + (T $adapter.Description)
+        if ($adapterText -match 'Virtual|VMware|Hyper-V|Docker|WSL|TAP|TUN|Loopback') { continue }
+        foreach ($unicast in @($adapter.GetIPProperties().UnicastAddresses)) {
+            if ($unicast.Address.AddressFamily -ne 'InterNetwork') { continue }
+            $ip = [string]$unicast.Address
+            if ($ip -match '^127\.' -or $ip -match '^169\.254\.') { continue }
+            if ($ipAddresses -notcontains $ip) { $ipAddresses += $ip }
+        }
+    }
+} catch { }
+if ($ipAddresses.Count -eq 0) {
+    try {
+        $ipAddresses = @([System.Net.Dns]::GetHostAddresses($computerName) |
+            Where-Object { $_.AddressFamily -eq 'InterNetwork' } |
+            ForEach-Object { $_.IPAddressToString })
+    } catch { }
+}
+$ipText = JoinU $ipAddresses ', '
+$scannedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+
+$data = [ordered]@{
+    computerName = $computerName
+    isLaptop = $isLaptop
+    manufacturer = $manufacturer
+    model = $model
+    serialNumber = $serial
+    cpu = $cpuName
+    cpuCores = $cpuCores
+    cpuThreads = $cpuThreads
+    ramGB = $ramGB
+    ramType = $ramType
+    ramBus = $ramBus
+    ramSlots = $ramSlots
+    storage = $storage
+    gpu = $gpu
+    gpuMemory = $gpuMemory
+    monitor = $monitor
+    screenSize = $screenSize
+    os = $osName
+    osCaption = $osCaption
+    osVersion = $osVersion
+    osBuild = $osBuild
+    osLicense = $license
+    ipAddresses = $ipText
+    scannedAt = $scannedAt
+}
+
+$json = $data | ConvertTo-Json -Depth 5 -Compress
+$b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($json))
+$b64 = $b64.TrimEnd('=').Replace('+', '-').Replace('/', '_')
+$code = 'MD1:' + $b64
+
+try { Set-Clipboard -Value $code } catch { }
+
+$opened = $false
+if ($Page) {
+    try {
+        Start-Process ($Page + '#d=' + $code)
+        $opened = $true
+    } catch { }
+}
+
+Write-Host ''
+Write-Host ' ============================================================' -ForegroundColor DarkGray
+Write-Host '  DA QUET XONG CAU HINH MAY' -ForegroundColor Green
+Write-Host ' ============================================================' -ForegroundColor DarkGray
+Write-Host ('  May      : ' + $computerName)
+Write-Host ('  CPU      : ' + $cpuName + ' (' + $cpuCores + ' nhan / ' + $cpuThreads + ' luong)')
+Write-Host ('  RAM      : ' + $ramGB + 'GB ' + $ramType + ' ' + $ramBus + 'MHz')
+Write-Host ('  O cung   : ' + $storage)
+Write-Host ('  GPU      : ' + $gpu + ' ' + $gpuMemory)
+Write-Host ('  Windows  : ' + $osCaption)
+Write-Host ('  IP       : ' + $ipText)
+Write-Host ''
+if ($opened) {
+    Write-Host '  Da mo trang web voi ket qua. Bam "Them vao danh sach" tren trang.' -ForegroundColor Cyan
+} else {
+    Write-Host '  Ma cau hinh da copy vao clipboard. Dan vao o "Dan ket qua" tren trang web.' -ForegroundColor Cyan
+}
+Write-Host '  (Neu clipboard trong, copy dong MD1: ben duoi)' -ForegroundColor DarkGray
+Write-Host ''
+Write-Host $code -ForegroundColor Yellow
+Write-Host ''

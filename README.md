@@ -25,6 +25,7 @@ Có thể thêm, sửa hoặc ngừng sử dụng phòng ban tại **Cơ cấu t
 - **Bảng điều khiển** — KPI tài sản, giá trị còn lại, cảnh báo bảo hành/bảo trì, cơ cấu tài sản theo Khối Đảng/Khối Nhà nước, biểu đồ phân bố và hoạt động gần đây.
 - **Quản lý thiết bị** — Danh sách, tìm kiếm không phân biệt dấu (kể cả cấu hình CPU/RAM/ổ cứng), lọc theo khối/phòng ban, sắp xếp, thêm/sửa/xóa, nhập và xuất Excel.
 - **Quét cấu hình máy** — Nút **Quét máy này** đọc CPU, RAM, ổ cứng, GPU, màn hình, Windows, serial và tự điền biểu mẫu PC/Laptop; chạy qua PowerShell có sẵn nên không bị Smart App Control chặn.
+- **Thu thập từ xa** — [Web tool](https://alexnguyenhao.github.io/manager-device/) chạy trên trình duyệt, máy cán bộ không cần cài gì: dán một lệnh PowerShell, gom nhiều máy rồi xuất CSV nhập vào phần mềm.
 - **Hồ sơ thiết bị** — Cấu hình chi tiết theo danh mục (CPU, RAM, GPU, dung lượng ổ cứng, hệ điều hành/Windows…), khấu hao, bảo hành, tệp đính kèm, lịch sử cấp phát/bảo trì/nhật ký.
 - **Cấp phát & thu hồi** — Bàn giao thiết bị cho cán bộ, công chức, theo dõi hạn trả, tình trạng trước/sau khi thu hồi.
 - **Bảo trì & sửa chữa** — Lập lịch, theo dõi tiến độ, chi phí, nhà cung cấp và lịch sử bảo dưỡng.
@@ -102,7 +103,20 @@ Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `Man
 
 ## Thu thập cấu hình nhanh
 
-### Quét ngay trong Manager Device (khuyến nghị)
+### Cách 1 — Web tool, máy khác không cần cài đặt
+
+Mở **<https://alexnguyenhao.github.io/manager-device/>** trên máy của cán bộ:
+
+1. Bấm **Sao chép lệnh**.
+2. Nhấn **Win + X** → **Terminal** → **Ctrl + V** → **Enter** (không cần Administrator, không tải tệp nào).
+3. Trang tự mở kèm kết quả; bấm **Thêm vào danh sách**. Gom đủ máy rồi **Xuất CSV**.
+4. Trong Manager Device: **Thiết bị → Nhập Excel → chọn tệp CSV**.
+
+Lệnh tải `scan.txt` về bộ nhớ rồi chạy nên **không tạo tệp `.bat`/`.ps1`** và không bị **Smart App Control** chặn. Mã quét `MD1:…` cũng được copy vào clipboard để dán thủ công nếu trình duyệt không tự mở. Dữ liệu chỉ lưu trong trình duyệt của bạn, không có máy chủ nào nhận.
+
+Xem chi tiết và giới hạn tại **`web-tool/README.md`**.
+
+### Cách 2 — Quét ngay trong Manager Device (khi máy đã cài ứng dụng)
 
 Mở **Thiết bị** → **Quét máy này** (hoặc nút **Quét máy này** trong biểu mẫu thêm thiết bị). Ứng dụng sẽ:
 
@@ -112,9 +126,7 @@ Mở **Thiết bị** → **Quét máy này** (hoặc nút **Quét máy này** t
 
 Cách hoạt động này **không tạo tệp `.bat`/`.ps1`**. Ứng dụng gọi `powershell.exe` có sẵn của Windows và gửi script qua standard input, nên không bị **Smart App Control** chặn với lỗi *“blocked an app with a dangerous file extension”*. Không cần quyền Administrator và không gửi dữ liệu ra ngoài.
 
-> Máy cần quét phải đang chạy Manager Device. Nếu chỉ muốn thu thập cấu hình từ xa mà không cài ứng dụng, xem mục **Công cụ CSV dự phòng** bên dưới.
-
-### Công cụ CSV dự phòng
+### Cách 3 — Công cụ CSV dự phòng
 
 Chỉ dùng khi máy đích không cài Manager Device và chính sách bảo mật cho phép chạy script. Chạy **`tools/ThuThapCauHinh.bat`** trên máy Windows cần kiểm tra. Script tự đọc cấu hình và xuất:
 
