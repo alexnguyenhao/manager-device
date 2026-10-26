@@ -88,6 +88,19 @@ Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `Man
 
 ---
 
+## Thu thập cấu hình nhanh
+
+Chạy **`tools/ThuThapCauHinh.bat`** trên máy Windows cần kiểm tra. Script tự đọc cấu hình và xuất:
+
+- **CSV** nhập thẳng vào phần mềm (Thiết bị → Nhập Excel).
+- **TXT** báo cáo chi tiết để đọc/đối chiếu.
+
+Nội dung thu thập: hãng, model, serial, CPU, RAM + loại RAM, ổ cứng, GPU, màn hình, hệ điều hành, bản quyền Windows, IP; với máy in: tên, driver, cổng, độ phân giải, in màu, kết nối, trạng thái, máy in mặc định. Máy in ảo (Fax, PDF, XPS, OneNote…) tự động bị bỏ qua.
+
+Không cần Administrator, không gửi dữ liệu ra ngoài. Xem hướng dẫn và các lệnh kiểm tra nhanh tại **`docs/thu-thap-cau-hinh.md`**.
+
+---
+
 ## Mẫu nhập thiết bị từ Excel
 
 File mẫu sẵn dùng: **`docs/ManagerDevice-Mau-Nhap-Thiet-Bi.xlsx`** (cũng tải được trong ứng dụng tại **Thiết bị → Nhập Excel → Tải mẫu**).
@@ -210,6 +223,7 @@ managerDevice/
 | `npm run build:linux` | Build AppImage cho Linux |
 | `npm run seed:catalogs` | Bổ sung danh mục thiết bị mặc định (bỏ qua danh mục đã có) |
 | `npm run template:excel` | Tạo file Excel mẫu nhập thiết bị từ dữ liệu danh mục hiện có |
+| `tools/ThuThapCauHinh.bat` | Quét cấu hình PC/Laptop/Máy in và xuất CSV nhập vào phần mềm |
 | `npm run reset:data` | Xóa dữ liệu nghiệp vụ, giữ lại tài khoản |
 
 ---
