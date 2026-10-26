@@ -278,7 +278,7 @@
     const json = decodeBase64Url(code.slice(CODE_PREFIX.length))
     const raw = JSON.parse(json)
     if (!raw || typeof raw !== 'object') throw new Error('Dữ liệu rỗng')
-    return mapPayload(raw)
+    return { ...mapPayload(raw), code }
   }
 
   function extractCodes(value) {
@@ -479,6 +479,7 @@
     $('export-csv').disabled = entries.length === 0
     $('clear-all').disabled = entries.length === 0
     $('backup-json').disabled = entries.length === 0
+    $('copy-codes').disabled = !entries.some((item) => item.code)
 
     entries.forEach((entry, index) => {
       const row = document.createElement('tr')
@@ -689,6 +690,22 @@
     toast('Đã xuất CSV. Vào Manager Device → Thiết bị → Nhập Excel.')
   }
 
+  /** Gom mã của tất cả máy đã lưu để mang sang máy tổng hợp. */
+  async function copyAllCodes() {
+    const codes = entries.map((item) => item.code).filter(Boolean)
+    if (!codes.length) {
+      toast('Chưa có mã nào để sao chép. Hãy quét máy trước.', 'error')
+      return
+    }
+    const ok = await copyToClipboard(codes.join('\n'))
+    toast(
+      ok
+        ? 'Đã copy ' + codes.length + ' mã. Dán tất cả vào ô "Dán kết quả" ở máy tổng hợp.'
+        : 'Không copy được. Hãy dùng "Sao lưu" để chuyển tệp.',
+      ok ? undefined : 'error'
+    )
+  }
+
   function exportJson() {
     download(
       'cau-hinh-may-' + timeStamp(new Date()) + '.json',
@@ -832,6 +849,7 @@
     })
 
     $('export-csv').addEventListener('click', exportCsv)
+    $('copy-codes').addEventListener('click', copyAllCodes)
     $('backup-json').addEventListener('click', exportJson)
     $('restore-json').addEventListener('click', () => $('restore-file').click())
     $('restore-file').addEventListener('change', (event) => {

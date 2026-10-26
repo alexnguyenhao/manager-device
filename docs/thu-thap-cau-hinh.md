@@ -14,8 +14,12 @@ Mở **<https://alexnguyenhao.github.io/manager-device/>** trên máy cần qué
 2. Nhấn **Win + X** → **Terminal** (hoặc PowerShell) → **Ctrl + V** → **Enter**.
 3. Script quét khoảng 3 giây, in mã `MD1:…`, copy vào clipboard và mở sẵn trang kèm kết quả.
 4. Kiểm tra bảng cấu hình, sửa tên/danh mục nếu cần rồi bấm **Thêm vào danh sách**.
-5. Làm lần lượt trên từng máy (dán nhiều mã cùng lúc cũng được), sau đó **Xuất CSV**.
-6. Trong Manager Device: **Thiết bị → Nhập Excel → chọn tệp CSV**.
+5. Bấm **Sao chép mã** để copy tất cả mã `MD1:…` của máy đó.
+6. Lặp lại trên từng máy, gửi các mã về **một máy tổng hợp** (Zalo, email, USB…).
+7. Ở máy tổng hợp: dán tất cả mã vào ô **Dán kết quả**, bấm **Phân tích** rồi **Thêm tất cả N máy**.
+8. Bấm **Xuất CSV** một lần, sau đó trong Manager Device: **Thiết bị → Nhập Excel → chọn tệp CSV**.
+
+Danh sách lưu trong trình duyệt của từng máy nên **không tự đồng bộ**; mã `MD1:` chính là cách mang dữ liệu giữa các máy. Cũng có thể dùng **Sao lưu** để xuất tệp JSON rồi **Nạp** ở máy tổng hợp.
 
 Không cần cài phần mềm, không cần Administrator, không tạo tệp thực thi. Dữ liệu chỉ nằm trong trình duyệt, không có máy chủ nhận dữ liệu.
 

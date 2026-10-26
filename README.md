@@ -109,10 +109,11 @@ Mở **<https://alexnguyenhao.github.io/manager-device/>** trên máy của cán
 
 1. Bấm **Sao chép lệnh**.
 2. Nhấn **Win + X** → **Terminal** → **Ctrl + V** → **Enter** (không cần Administrator, không tải tệp nào).
-3. Trang tự mở kèm kết quả; bấm **Thêm vào danh sách**. Gom đủ máy rồi **Xuất CSV**.
-4. Trong Manager Device: **Thiết bị → Nhập Excel → chọn tệp CSV**.
+3. Trang tự mở kèm kết quả; bấm **Thêm vào danh sách**, rồi **Sao chép mã** để lấy mã `MD1:…`.
+4. Lặp lại trên từng máy và gửi mã về một máy tổng hợp. Dán tất cả mã vào ô **Dán kết quả** → **Thêm tất cả** → **Xuất CSV** một lần.
+5. Trong Manager Device: **Thiết bị → Nhập Excel → chọn tệp CSV**.
 
-Lệnh tải `scan.txt` về bộ nhớ rồi chạy nên **không tạo tệp `.bat`/`.ps1`** và không bị **Smart App Control** chặn. Mã quét `MD1:…` cũng được copy vào clipboard để dán thủ công nếu trình duyệt không tự mở. Dữ liệu chỉ lưu trong trình duyệt của bạn, không có máy chủ nào nhận.
+Danh sách không tự đồng bộ giữa các máy — mã `MD1:` (hoặc tệp **Sao lưu** JSON) là cách mang dữ liệu về một chỗ. Lệnh tải `scan.txt` về bộ nhớ rồi chạy nên **không tạo tệp `.bat`/`.ps1`** và không bị **Smart App Control** chặn. Dữ liệu chỉ lưu trong trình duyệt của bạn, không có máy chủ nào nhận.
 
 Xem chi tiết và giới hạn tại **`web-tool/README.md`**.
 

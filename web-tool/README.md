@@ -11,6 +11,17 @@ Trang tĩnh (HTML/CSS/JS thuần, không build) giúp máy khác **không cần 
 
 Dữ liệu chỉ nằm trong `localStorage` của trình duyệt. Không có máy chủ, không có analytics, không gửi dữ liệu đi đâu.
 
+## Gom nhiều máy rồi xuất CSV một lần
+
+Danh sách **không tự đồng bộ** giữa các máy: mỗi trình duyệt có `localStorage` riêng. Cách gom không cần máy chủ:
+
+1. Trên từng máy: quét → **Thêm vào danh sách** → bấm **Sao chép mã** (copy toàn bộ mã `MD1:…` của máy đó).
+2. Gửi các mã về máy tổng hợp (Zalo, email, USB…). Có thể gửi cả đoạn chat, không cần tách dòng.
+3. Trên máy tổng hợp: dán tất cả vào ô **Dán kết quả** → **Phân tích** → **Thêm tất cả N máy**.
+4. Bấm **Xuất CSV** — tệp chứa đủ các máy, nhập một lần vào Manager Device.
+
+Mỗi dòng đã lưu vẫn giữ mã gốc, nên **Sao chép mã** ở máy tổng hợp cũng copy lại được toàn bộ. Nếu không muốn gửi mã qua chat, dùng **Sao lưu** để xuất tệp JSON rồi **Nạp** tệp đó ở máy tổng hợp.
+
 ## Giới hạn cần biết
 
 Trình duyệt bị sandbox nên **không đọc được phần cứng**. Web page không thể tự lấy model CPU, loại RAM, ổ cứng, serial… Vì vậy bước chạy PowerShell là bắt buộc. Lệnh chỉ đọc thông tin qua CIM/WMI, không thay đổi gì trên máy và không cần Administrator.

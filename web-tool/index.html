@@ -100,7 +100,7 @@
         <div class="row">
           <button id="analyze" class="btn btn-primary" type="button">Phân tích</button>
           <span id="paste-hint" class="muted small">
-            Hỗ trợ dán nhiều mã một lúc (mỗi mã một dòng) để thêm hàng loạt.
+            Dán một hoặc nhiều mã (mỗi mã một dòng, hoặc cả đoạn chat) để thêm hàng loạt.
           </span>
         </div>
         <div id="paste-error" class="alert alert-error" hidden></div>
@@ -173,12 +173,21 @@
             <p class="muted">Lưu trong trình duyệt này. Xuất CSV khi đã gom đủ máy.</p>
           </div>
           <div class="row row-tight">
+            <button id="copy-codes" class="btn btn-ghost" type="button" title="Sao chép mã của tất cả máy để dán sang máy tổng hợp">
+              Sao chép mã
+            </button>
             <button id="export-csv" class="btn btn-primary" type="button">Xuất CSV</button>
             <button id="backup-json" class="btn btn-ghost btn-sm" type="button">Sao lưu</button>
             <button id="restore-json" class="btn btn-ghost btn-sm" type="button">Nạp</button>
             <button id="clear-all" class="btn btn-ghost btn-sm btn-danger" type="button">Xóa hết</button>
             <input id="restore-file" type="file" accept="application/json,.json" hidden />
           </div>
+        </div>
+
+        <div class="hint">
+          <b>Gom nhiều máy:</b> mỗi máy quét xong bấm <b>Thêm vào danh sách</b>, rồi bấm
+          <b>Sao chép mã</b> và gửi các mã đó về máy tổng hợp. Ở máy tổng hợp, dán tất cả mã vào ô
+          <b>Dán kết quả</b> phía trên, bấm <b>Thêm tất cả</b> rồi <b>Xuất CSV</b> một lần.
         </div>
 
         <div class="table-wrap">
@@ -207,6 +216,7 @@
         <ul>
           <li>Trình duyệt <b>không đọc được</b> phần cứng, nên bước chạy PowerShell là bắt buộc. Lệnh chỉ đọc thông tin, không thay đổi gì trên máy.</li>
           <li>Kết quả quét được copy vào clipboard và mở sẵn trên trang này; nếu trình duyệt không tự mở, dán mã vào ô phía trên.</li>
+          <li><b>Gom nhiều máy:</b> danh sách không tự đồng bộ giữa các máy. Quét ở từng máy, bấm <b>Sao chép mã</b>, gửi các mã về một máy rồi dán tất cả vào ô <b>Dán kết quả</b> — sau đó <b>Xuất CSV</b> một lần. Có thể dán cả đoạn chat chứa nhiều mã.</li>
           <li>Xuất CSV rồi vào Manager Device → <b>Thiết bị</b> → <b>Nhập Excel</b> → chọn tệp CSV. Danh mục <b>Máy tính để bàn</b> và <b>Laptop</b> phải đang hoạt động.</li>
           <li>Mã thiết bị để trống để phần mềm tự sinh theo danh mục. Trạng thái để trống để không bắt buộc phải có người sử dụng.</li>
           <li>Dữ liệu chỉ lưu trong trình duyệt của bạn (localStorage). Không có máy chủ nào nhận dữ liệu.</li>
