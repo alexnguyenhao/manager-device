@@ -59,7 +59,7 @@ Bộ cài Windows (.exe) và AppImage Linux được tạo tự động bởi Gi
 
 **https://github.com/alexnguyenhao/manager-device/releases/latest**
 
-Tải `ManagerDevice-Setup-1.0.0.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng.
+Tải `ManagerDevice-Setup-1.0.1.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng. File Excel mẫu nhập thiết bị cũng được đính kèm trong mục **Assets** của bản phát hành.
 
 ---
 
@@ -85,6 +85,27 @@ npm run build:win
 Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `ManagerDevice-Setup-1.0.0.exe`.
 
 > Nếu mạng npm không ổn định, có thể chạy `npm install --prefer-offline` hoặc cấu hình registry nội bộ. Không cần tải binary Electron riêng — npm sẽ tự tải khi cài đặt bình thường.
+
+---
+
+## Mẫu nhập thiết bị từ Excel
+
+File mẫu sẵn dùng: **`docs/ManagerDevice-Mau-Nhap-Thiet-Bi.xlsx`** (cũng tải được trong ứng dụng tại **Thiết bị → Nhập Excel → Tải mẫu**).
+
+- Mỗi danh mục có một sheet riêng: Máy tính để bàn, Laptop, Máy in, Máy scan, Máy chiếu, Thiết bị mạng, Bộ lưu điện, Màn hình, Thiết bị khác.
+- Cột **Danh mục** tự lấy theo tên sheet nếu để trống.
+- **Dropdown** cho Danh mục, Trạng thái, Tình trạng, Bộ phận, Vị trí, Người sử dụng, Nhà cung cấp và các trường chọn (Loại RAM, Hệ điều hành, Cổng kết nối…).
+- Cột thông số kỹ thuật (CPU, RAM, GPU, ổ cứng, hệ điều hành, tốc độ in, khổ giấy…) khớp đúng `specSchema` của từng danh mục nên được lưu vào `specs` khi nhập.
+- Ô số (RAM, giá mua, tháng bảo hành…) chỉ nhận số; ngày mua theo `dd/mm/yyyy`.
+- Dòng trống được bỏ qua; dòng lỗi được báo kèm tên sheet và số dòng, các dòng hợp lệ vẫn được nhập.
+
+Tạo lại mẫu khi danh mục/bộ phận/nhân viên thay đổi:
+
+```bash
+npm run template:excel
+# hoặc chỉ định database và file đầu ra
+node scripts/generate-import-template.mjs --db "/path/to/manager-device.db" --out docs/mau-nhap.xlsx
+```
 
 ---
 
@@ -188,6 +209,7 @@ managerDevice/
 | `npm run build:win` | Build và tạo bộ cài Windows trong `release/` |
 | `npm run build:linux` | Build AppImage cho Linux |
 | `npm run seed:catalogs` | Bổ sung danh mục thiết bị mặc định (bỏ qua danh mục đã có) |
+| `npm run template:excel` | Tạo file Excel mẫu nhập thiết bị từ dữ liệu danh mục hiện có |
 | `npm run reset:data` | Xóa dữ liệu nghiệp vụ, giữ lại tài khoản |
 
 ---

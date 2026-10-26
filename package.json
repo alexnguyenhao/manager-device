@@ -1,6 +1,6 @@
 {
   "name": "manager-device",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Phần mềm quản lý thiết bị và tài sản CNTT chạy cục bộ",
   "main": "./out/main/index.js",
   "author": "Manager Device",
@@ -16,7 +16,8 @@
     "build:win": "npm run build && electron-builder --win --x64",
     "build:linux": "npm run build && electron-builder --linux",
     "reset:data": "node scripts/reset-production-data.mjs",
-    "seed:catalogs": "node scripts/seed-catalogs.mjs"
+    "seed:catalogs": "node scripts/seed-catalogs.mjs",
+    "template:excel": "node scripts/generate-import-template.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

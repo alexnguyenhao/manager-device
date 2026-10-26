@@ -5,9 +5,11 @@ import type {
   AssetListParams,
   AssetStatus,
   AuthUser,
+  Category,
   ExportResult,
   ImportResult,
-  ReportParams
+  ReportParams,
+  SpecField
 } from '../../shared/types'
 import { listAllAssets } from './asset.service'
 import { buildReport } from './report.service'
@@ -334,6 +336,481 @@ export async function exportAuditExcel(sessionId: number, user: AuthUser): Promi
   return result
 }
 
+/* --------------------------- Excel templates --------------------------- */
+
+const SHEET_GUIDE = 'Hướng dẫn'
+const SHEET_LISTS = 'Danh sách'
+const SHEET_EXAMPLES = 'Ví dụ (không nhập)'
+const SKIPPED_SHEETS = new Set([SHEET_GUIDE, SHEET_LISTS, SHEET_EXAMPLES])
+const TEMPLATE_MAX_ROW = 500
+
+/** Cột dùng chung cho mọi danh mục, khớp với HEADER_ALIASES khi nhập. */
+interface TemplateColumn {
+  header: string
+  field: string
+  width: number
+  note?: string
+  kind?: 'status' | 'condition' | 'category' | 'department' | 'location' | 'employee' | 'supplier' | 'money' | 'integer'
+}
+
+const COMMON_COLUMNS: TemplateColumn[] = [
+  {
+    header: 'Mã thiết bị',
+    field: 'code',
+    width: 15,
+    note: 'Không bắt buộc. Để trống để hệ thống tự sinh theo tiền tố danh mục.'
+  },
+  {
+    header: 'Tên thiết bị (*)',
+    field: 'name',
+    width: 36,
+    note: 'BẮT BUỘC. Tối thiểu 2 ký tự. Ví dụ: Máy in HP LaserJet Pro M404dn.'
+  },
+  {
+    header: 'Danh mục (*)',
+    field: 'category',
+    width: 22,
+    kind: 'category',
+    note: 'Chọn trong danh sách. Có thể để trống để dùng đúng danh mục của sheet.'
+  },
+  { header: 'Serial', field: 'serial', width: 22, note: 'Số serial của thiết bị (nếu có).' },
+  { header: 'Model', field: 'model', width: 22, note: 'Model/series của thiết bị.' },
+  { header: 'Hãng sản xuất', field: 'manufacturer', width: 18, note: 'Ví dụ: Dell, HP, Canon, Asus.' },
+  {
+    header: 'Trạng thái',
+    field: 'status',
+    width: 16,
+    kind: 'status',
+    note:
+      'Chọn trong danh sách. "Đang sử dụng" bắt buộc phải chọn Người sử dụng; nếu chưa có nhân viên, hãy chọn trạng thái khác hoặc để trống.'
+  },
+  {
+    header: 'Tình trạng',
+    field: 'condition',
+    width: 14,
+    kind: 'condition',
+    note: 'Chọn trong danh sách để tránh sai dữ liệu.'
+  },
+  {
+    header: 'Bộ phận',
+    field: 'department',
+    width: 24,
+    kind: 'department',
+    note: 'Chọn trong danh sách. Để trống nếu chưa khai báo bộ phận.'
+  },
+  {
+    header: 'Vị trí',
+    field: 'location',
+    width: 24,
+    kind: 'location',
+    note: 'Chọn trong danh sách. Để trống nếu chưa khai báo vị trí.'
+  },
+  {
+    header: 'Người sử dụng',
+    field: 'employee',
+    width: 26,
+    kind: 'employee',
+    note: 'Chọn trong danh sách. Để trống nếu chưa khai báo nhân viên.'
+  },
+  {
+    header: 'Nhà cung cấp',
+    field: 'supplier',
+    width: 28,
+    kind: 'supplier',
+    note: 'Chọn trong danh sách. Để trống nếu chưa khai báo nhà cung cấp.'
+  },
+  {
+    header: 'Ngày mua',
+    field: 'purchaseDate',
+    width: 13,
+    note: 'Định dạng dd/mm/yyyy. Ví dụ: 15/03/2026.'
+  },
+  {
+    header: 'Giá mua',
+    field: 'purchasePrice',
+    width: 16,
+    kind: 'money',
+    note: 'Chỉ nhập số tiền, không gõ chữ "đ" hay dấu chấm. Ví dụ: 18500000.'
+  },
+  {
+    header: 'Tháng bảo hành',
+    field: 'warrantyMonths',
+    width: 15,
+    kind: 'integer',
+    note: 'Số tháng bảo hành. Để trống để dùng mặc định của danh mục.'
+  },
+  {
+    header: 'Tháng khấu hao',
+    field: 'depreciationMonths',
+    width: 15,
+    kind: 'integer',
+    note: 'Số tháng khấu hao. Để trống để dùng mặc định của danh mục.'
+  },
+  {
+    header: 'Giá trị thanh lý',
+    field: 'salvageValue',
+    width: 16,
+    kind: 'money',
+    note: 'Chỉ nhập số tiền. Để trống nếu không có.'
+  },
+  { header: 'Số hóa đơn', field: 'invoice', width: 16, note: 'Số hóa đơn/chứng từ mua hàng.' },
+  { header: 'Ghi chú', field: 'note', width: 32, note: 'Ghi chú thêm (nếu có).' }
+]
+
+function specHeaderLabel(field: SpecField): string {
+  return field.unit ? `${field.label} (${field.unit})` : field.label
+}
+
+function specNote(field: SpecField): string {
+  const parts: string[] = []
+  if (field.type === 'select' && field.options?.length) {
+    parts.push(`Chọn một giá trị: ${field.options.join(', ')}.`)
+  } else if (field.type === 'number') {
+    parts.push(`Chỉ nhập số${field.unit ? ` (${field.unit})` : ''}.`)
+  } else {
+    parts.push(field.placeholder ? `Ví dụ: ${field.placeholder}.` : 'Nhập giá trị thông số.')
+  }
+  return parts.join(' ')
+}
+
+function buildSpecAliasMap(categories: Category[]): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const category of categories) {
+    for (const field of category.specSchema) {
+      map.set(normalizeHeader(specHeaderLabel(field)), field.key)
+      map.set(normalizeHeader(field.label), field.key)
+      map.set(normalizeHeader(field.key), field.key)
+    }
+  }
+  return map
+}
+
+function inlineListFormula(values: string[]): string | null {
+  const joined = values.join(',')
+  if (joined.length > 230) return null
+  return `"${joined.replace(/"/g, '""')}"`
+}
+
+function addListValidation(
+  sheet: ExcelJS.Worksheet,
+  range: string,
+  formula: string,
+  kindLabel: string
+): void {
+  validationsOf(sheet).add(range, {
+    type: 'list',
+    allowBlank: true,
+    showErrorMessage: true,
+    errorStyle: 'stop',
+    errorTitle: 'Giá trị không hợp lệ',
+    error: `Vui lòng chọn ${kindLabel} trong danh sách có sẵn.`,
+    formulae: [formula]
+  })
+}
+
+function addNumberValidation(
+  sheet: ExcelJS.Worksheet,
+  range: string,
+  label: string,
+  integer = false
+): void {
+  validationsOf(sheet).add(range, {
+    type: integer ? 'whole' : 'decimal',
+    operator: 'greaterThanOrEqual',
+    allowBlank: true,
+    showErrorMessage: true,
+    errorStyle: 'stop',
+    errorTitle: 'Giá trị không hợp lệ',
+    error: `${label} phải là ${integer ? 'số nguyên' : 'số'} lớn hơn hoặc bằng 0.`,
+    formulae: [0]
+  })
+}
+
+/** ExcelJS hỗ trợ dataValidations theo vùng nhưng chưa khai báo trong typings. */
+function validationsOf(sheet: ExcelJS.Worksheet): {
+  add(range: string, value: ExcelJS.DataValidation): void
+} {
+  return (sheet as unknown as { dataValidations: { add(range: string, value: ExcelJS.DataValidation): void } })
+    .dataValidations
+}
+
+function columnLetter(columnNumber: number): string {
+  let value = columnNumber
+  let letters = ''
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    letters = String.fromCharCode(65 + remainder) + letters
+    value = Math.floor((value - 1) / 26)
+  }
+  return letters
+}
+
+/** Tạo workbook mẫu nhập thiết bị: mỗi danh mục một sheet, có dropdown chống nhập sai. */
+export function buildImportTemplateWorkbook(): ExcelJS.Workbook {
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'Manager Device'
+  workbook.lastModifiedBy = 'Manager Device'
+  workbook.created = new Date()
+  workbook.modified = new Date()
+
+  const categories = listCategories().filter((category) => category.isActive)
+  const departments = listDepartments()
+  const locations = listLocations()
+  const suppliers = listSuppliers()
+  const employees = listEmployees()
+
+  const statusOptions = Object.values(ASSET_STATUS_META)
+    .map((meta) => meta.label)
+    .filter(
+      (label) => label !== ASSET_STATUS_META.in_use.label || employees.length > 0
+    )
+  const conditionOptions = Object.values(ASSET_CONDITION_META).map((meta) => meta.label)
+
+  /* ------------------------------ Lists sheet ----------------------------- */
+  const lists = workbook.addWorksheet(SHEET_LISTS)
+  lists.state = 'hidden'
+  const listColumns: Array<{ header: string; values: string[] }> = [
+    { header: 'Danh mục', values: categories.map((category) => category.name) },
+    { header: 'Trạng thái', values: statusOptions },
+    { header: 'Tình trạng', values: conditionOptions },
+    { header: 'Bộ phận', values: departments.map((item) => item.name) },
+    { header: 'Vị trí', values: locations.map((item) => item.name) },
+    { header: 'Nhà cung cấp', values: suppliers.map((item) => item.name) },
+    { header: 'Nhân viên', values: employees.map((item) => item.fullName) }
+  ]
+  const listRanges = new Map<string, string>()
+  listColumns.forEach((column, index) => {
+    const col = columnLetter(index + 1)
+    const headerCell = lists.getCell(`${col}1`)
+    headerCell.value = column.header
+    headerCell.font = { bold: true }
+    column.values.forEach((value, rowIndex) => {
+      lists.getCell(`${col}${rowIndex + 2}`).value = value
+    })
+    if (column.values.length > 0) {
+      listRanges.set(
+        column.header,
+        `'${SHEET_LISTS}'!$${col}$2:$${col}$${column.values.length + 1}`
+      )
+    }
+  })
+  lists.columns = listColumns.map(() => ({ width: 28 }))
+
+  /* ----------------------------- Data sheets ------------------------------ */
+  for (const category of categories) {
+    const sheet = workbook.addWorksheet(category.name.slice(0, 31), {
+      properties: { tabColor: { argb: '1E40AF' } }
+    })
+    sheet.views = [{ state: 'frozen', ySplit: 1 }]
+
+    const specFields = category.specSchema
+    const columns: Array<TemplateColumn | { spec: SpecField }> = [
+      ...COMMON_COLUMNS,
+      ...specFields.map((field) => ({ spec: field }))
+    ]
+    sheet.columns = columns.map((column) => ({
+      width: 'spec' in column ? 22 : column.width
+    }))
+
+    const headerRow = sheet.getRow(1)
+    headerRow.values = columns.map((column) =>
+      'spec' in column ? specHeaderLabel(column.spec) : column.header
+    )
+    styleHeader(headerRow)
+    headerRow.height = 34
+    headerRow.alignment = { vertical: 'middle', wrapText: true }
+
+    columns.forEach((column, index) => {
+      const cell = headerRow.getCell(index + 1)
+      if ('spec' in column) {
+        cell.note = specNote(column.spec)
+      } else if (column.note) {
+        cell.note = column.note
+      }
+    })
+
+    sheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: columns.length }
+    }
+
+    const lastRow = TEMPLATE_MAX_ROW
+    columns.forEach((column, index) => {
+      const letter = columnLetter(index + 1)
+      const range = `${letter}2:${letter}${lastRow}`
+      if ('spec' in column) {
+        const field = column.spec
+        if (field.type === 'select' && field.options?.length) {
+          const formula = inlineListFormula(field.options)
+          if (formula) addListValidation(sheet, range, formula, field.label)
+        } else if (field.type === 'number') {
+          addNumberValidation(sheet, range, field.label)
+        }
+        return
+      }
+      switch (column.kind) {
+        case 'status':
+        case 'condition': {
+          const key = column.kind === 'status' ? 'Trạng thái' : 'Tình trạng'
+          const formula = listRanges.get(key)
+          if (formula) addListValidation(sheet, range, formula, column.header.toLowerCase())
+          break
+        }
+        case 'department':
+        case 'location':
+        case 'employee':
+        case 'supplier': {
+          const key =
+            column.kind === 'department'
+              ? 'Bộ phận'
+              : column.kind === 'location'
+                ? 'Vị trí'
+                : column.kind === 'employee'
+                  ? 'Nhân viên'
+                  : 'Nhà cung cấp'
+          const formula = listRanges.get(key)
+          if (formula) addListValidation(sheet, range, formula, column.header.toLowerCase())
+          break
+        }
+        case 'category': {
+          const formula = inlineListFormula([category.name])
+          if (formula) addListValidation(sheet, range, formula, 'danh mục')
+          break
+        }
+        case 'money':
+          addNumberValidation(sheet, range, column.header)
+          break
+        case 'integer':
+          addNumberValidation(sheet, range, column.header, true)
+          break
+        default:
+          break
+      }
+    })
+
+    // Định dạng hiển thị tiền tệ cho cột giá mua / giá trị thanh lý.
+    columns.forEach((column, index) => {
+      if ('spec' in column) return
+      if (column.kind === 'money') {
+        sheet.getColumn(index + 1).numFmt = '#,##0'
+        sheet.getColumn(index + 1).width = column.width
+      }
+    })
+  }
+
+  /* ---------------------------- Hướng dẫn sheet --------------------------- */
+  const guide = workbook.addWorksheet(SHEET_GUIDE, { properties: { tabColor: { argb: '16A34A' } } })
+  guide.columns = [{ width: 30 }, { width: 92 }, { width: 26 }]
+  const title = guide.addRow(['HƯỚNG DẪN NHẬP THIẾT BỊ TỪ EXCEL'])
+  title.font = { bold: true, size: 15, color: { argb: '1E3A8A' } }
+  guide.mergeCells('A1:C1')
+  guide.addRow([])
+  const intro = guide.addRow([
+    'Mẫu này được tạo từ dữ liệu danh mục hiện có. Mỗi danh mục có một sheet riêng; chỉ nhập vào đúng sheet loại thiết bị.',
+    '',
+    ''
+  ])
+  intro.getCell(1).alignment = { wrapText: true }
+  guide.mergeCells(`A${intro.number}:C${intro.number}`)
+  guide.addRow([])
+
+  const section = (text: string): void => {
+    const row = guide.addRow([text])
+    row.font = { bold: true, size: 12, color: { argb: '1E40AF' } }
+    guide.mergeCells(`A${row.number}:C${row.number}`)
+  }
+  const bullet = (text: string): void => {
+    const row = guide.addRow([`•  ${text}`])
+    row.getCell(1).alignment = { wrapText: true, vertical: 'top' }
+    guide.mergeCells(`A${row.number}:C${row.number}`)
+  }
+
+  section('QUY TẮC BẮT BUỘC')
+  bullet('Mỗi dòng là một thiết bị. Không sửa tên cột, không chèn dòng phía trên dòng tiêu đề.')
+  bullet('Tên thiết bị là bắt buộc, tối thiểu 2 ký tự.')
+  bullet('Cột Danh mục có thể để trống — hệ thống tự dùng đúng danh mục của sheet đang nhập.')
+  bullet('Trạng thái, Tình trạng, Bộ phận, Vị trí, Người sử dụng, Nhà cung cấp chỉ chọn từ dropdown để tránh sai dữ liệu.')
+  bullet('Trạng thái "Đang sử dụng" bắt buộc phải chọn Người sử dụng. Nếu hệ thống chưa có nhân viên, trạng thái này sẽ không xuất hiện trong dropdown — hãy để trống hoặc chọn trạng thái khác.')
+  bullet('Các cột thông số kỹ thuật (CPU, RAM, GPU, ổ cứng, hệ điều hành, tốc độ in…) có dropdown hoặc chỉ nhận số.')
+  bullet('Ngày mua nhập dd/mm/yyyy. Tiền chỉ nhập số, không gõ "đ" hoặc dấu chấm phân cách.')
+  bullet('Để trống Mã thiết bị nếu muốn hệ thống tự sinh mã theo danh mục.')
+  bullet('Dòng trống được bỏ qua. Dòng lỗi sẽ được báo chi tiết, các dòng hợp lệ vẫn được nhập.')
+  bullet('Các cột Bộ phận/Vị trí/Người sử dụng/Nhà cung cấp: để trống nếu chưa khai báo trong hệ thống, hoặc chọn đúng giá trị có sẵn.')
+  guide.addRow([])
+
+  section('DANH MỤC TRONG MẪU')
+  const catHeader = guide.addRow(['Mã', 'Tên danh mục', 'Số trường thông số'])
+  catHeader.font = { bold: true }
+  for (const category of categories) {
+    guide.addRow([category.code, category.name, category.specSchema.length])
+  }
+  guide.addRow([])
+
+  section('VÍ DỤ CÁCH ĐIỀN')
+  const exampleHeader = guide.addRow([
+    'Danh mục',
+    'Tên thiết bị / Cấu hình',
+    'Ghi chú'
+  ])
+  exampleHeader.font = { bold: true }
+  const examples: Array<[string, string, string]> = [
+    ['Máy tính để bàn', 'Máy tính để bàn Dell OptiPlex 7010', 'CPU: Intel Core i5-12400; RAM: 16 GB; Ổ cứng: SSD 512GB; OS: Windows 11 Pro'],
+    ['Laptop', 'Laptop Dell Latitude 5440', 'CPU: Intel Core i7-1355U; RAM: 16 GB; Ổ cứng: SSD 1TB; OS: Windows 11 Pro'],
+    ['Máy in', 'Máy in HP LaserJet Pro M404dn', 'Công nghệ in: Laser đen trắng; Khổ giấy: A4; Kết nối: USB + LAN'],
+    ['Máy scan', 'Máy scan Fujitsu fi-7160', 'Loại máy: ADF; Độ phân giải: 600 dpi; Khổ giấy: A4']
+  ]
+  for (const row of examples) guide.addRow(row)
+  guide.addRow([])
+
+  section('QUY TRÌNH NHẬP')
+  bullet('1. Mở đúng sheet danh mục (ví dụ "Máy in") và điền từng dòng thiết bị.')
+  bullet('2. Lưu tệp dưới định dạng .xlsx.')
+  bullet('3. Trong phần mềm: Thiết bị → Nhập Excel → chọn tệp vừa lưu.')
+  bullet('4. Kiểm tra kết quả nhập; sửa các dòng báo lỗi rồi nhập lại nếu cần.')
+  bullet('Nếu danh mục hoặc bộ phận/vị trí/nhân viên thay đổi, hãy tải lại mẫu mới từ phần mềm để cập nhật dropdown.')
+
+  /* --------------------------- Ví dụ sheet (bỏ qua) ---------------------- */
+  const exampleSheet = workbook.addWorksheet(SHEET_EXAMPLES)
+  exampleSheet.state = 'hidden'
+  const exampleColumns = ['Danh mục', 'Tên thiết bị', 'Serial', 'Model', 'Hãng sản xuất', 'Trạng thái', 'Tình trạng', 'Ngày mua', 'Giá mua', 'Ghi chú']
+  exampleSheet.addRow(exampleColumns).font = { bold: true }
+  exampleSheet.addRow([
+    'Máy tính để bàn',
+    'Máy tính để bàn Dell OptiPlex 7010',
+    'DLL7010-2026-001',
+    'OptiPlex 7010',
+    'Dell',
+    'Sẵn sàng',
+    'Tốt',
+    '15/03/2026',
+    18500000,
+    'Dòng ví dụ - không được nhập'
+  ])
+  exampleSheet.addRow([
+    'Máy in',
+    'Máy in HP LaserJet Pro M404dn',
+    'HP404-2026-001',
+    'LaserJet Pro M404dn',
+    'HP',
+    'Đang sử dụng',
+    'Tốt',
+    '20/03/2026',
+    6500000,
+    'Dòng ví dụ - không được nhập'
+  ])
+
+  return workbook
+}
+
+export async function downloadImportTemplate(user: AuthUser): Promise<ExportResult> {
+  const workbook = buildImportTemplateWorkbook()
+  const result = await savePath(workbook, 'mau-nhap-thiet-bi.xlsx', 'Tải mẫu nhập thiết bị')
+  if (!result.canceled) {
+    logActivity(user, 'Tải mẫu nhập thiết bị Excel', 'asset', null, 'Mẫu nhập')
+  }
+  return result
+}
+
 /* ------------------------------- Import -------------------------------- */
 
 const HEADER_ALIASES: Record<string, string> = {
@@ -428,9 +905,65 @@ function parseDateValue(value: ExcelJS.CellValue): string | null {
 
 function parseNumberValue(value: ExcelJS.CellValue): number {
   if (typeof value === 'number') return value
-  const text = cellText(value).replace(/[^\d.-]/g, '')
+  let text = cellText(value).replace(/[^\d.,-]/g, '')
+  if (!text) return 0
+  // Hỗ trợ cả 18.500.000 (VN) và 18,500,000 (US), cũng như 1.500,50.
+  if (text.includes('.') && text.includes(',')) {
+    text = text.replace(/\./g, '').replace(/,/g, '.')
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(text)) {
+    text = text.replace(/\./g, '')
+  } else if (/^\d{1,3}(,\d{3})+$/.test(text)) {
+    text = text.replace(/,/g, '')
+  } else {
+    text = text.replace(/,/g, '.')
+  }
   const number = Number(text)
   return Number.isFinite(number) ? number : 0
+}
+
+function parseSpecNumberValue(value: string): number | null {
+  let text = value.replace(/[^\d.,-]/g, '')
+  if (!text) return null
+  if (text.includes('.') && text.includes(',')) {
+    text = text.replace(/\./g, '').replace(/,/g, '.')
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(text)) {
+    text = text.replace(/\./g, '')
+  } else if (/^\d{1,3}(,\d{3})+$/.test(text)) {
+    text = text.replace(/,/g, '')
+  } else {
+    text = text.replace(/,/g, '.')
+  }
+  const number = Number(text)
+  return Number.isFinite(number) ? number : null
+}
+
+interface SheetHeader {
+  headerRow: number
+  columnMap: Map<string, number>
+}
+
+function scanSheetHeader(
+  sheet: ExcelJS.Worksheet,
+  specAliases: Map<string, string>
+): SheetHeader | null {
+  for (let rowNumber = 1; rowNumber <= Math.min(15, sheet.rowCount); rowNumber++) {
+    const candidate = new Map<string, number>()
+    sheet.getRow(rowNumber).eachCell((cell, colNumber) => {
+      const header = normalizeHeader(cellText(cell.value))
+      if (!header) return
+      const common = HEADER_ALIASES[header]
+      if (common) {
+        candidate.set(common, colNumber)
+        return
+      }
+      const specKey = specAliases.get(header)
+      if (specKey) candidate.set(`spec:${specKey}`, colNumber)
+    })
+    if (candidate.has('name') && candidate.has('category')) {
+      return { headerRow: rowNumber, columnMap: candidate }
+    }
+  }
+  return null
 }
 
 export async function importAssetsExcel(user: AuthUser): Promise<ImportResult> {
@@ -459,47 +992,13 @@ export async function importAssetsExcel(user: AuthUser): Promise<ImportResult> {
     }
   }
 
-  const sheet = workbook.worksheets[0]
-  if (!sheet) {
-    return {
-      canceled: false,
-      imported: 0,
-      failed: 1,
-      errors: [{ row: 0, message: 'Tệp không có dữ liệu.' }]
-    }
+  const categories = listCategories().filter((category) => category.isActive)
+  const specAliases = buildSpecAliasMap(categories)
+  const categoryBySheet = new Map<string, Category>()
+  for (const category of categories) {
+    categoryBySheet.set(normalizeForSearch(category.name), category)
   }
 
-  let headerRow = 0
-  const columnMap = new Map<string, number>()
-  for (let rowNumber = 1; rowNumber <= Math.min(15, sheet.rowCount); rowNumber++) {
-    const row = sheet.getRow(rowNumber)
-    const candidate = new Map<string, number>()
-    row.eachCell((cell, colNumber) => {
-      const field = HEADER_ALIASES[normalizeHeader(cellText(cell.value))]
-      if (field) candidate.set(field, colNumber)
-    })
-    if (candidate.has('name') && candidate.has('category')) {
-      headerRow = rowNumber
-      candidate.forEach((col, field) => columnMap.set(field, col))
-      break
-    }
-  }
-
-  if (!headerRow) {
-    return {
-      canceled: false,
-      imported: 0,
-      failed: 1,
-      errors: [
-        {
-          row: 0,
-          message: 'Không tìm thấy dòng tiêu đề. Cần có cột "Tên thiết bị" và "Danh mục".'
-        }
-      ]
-    }
-  }
-
-  const categories = listCategories()
   const departments = listDepartments()
   const locations = listLocations()
   const suppliers = listSuppliers()
@@ -520,92 +1019,161 @@ export async function importAssetsExcel(user: AuthUser): Promise<ImportResult> {
 
   let imported = 0
   const errors: ImportResult['errors'] = []
-  const maxRow = sheet.rowCount
+  let matchedSheets = 0
 
-  for (let rowNumber = headerRow + 1; rowNumber <= maxRow; rowNumber++) {
+  const sheets = workbook.worksheets.filter((sheet) => !SKIPPED_SHEETS.has(sheet.name.trim()))
+
+  for (const sheet of sheets) {
     if (errors.length >= 100) break
-    const row = sheet.getRow(rowNumber)
-    const get = (field: string): ExcelJS.CellValue => {
-      const col = columnMap.get(field)
-      return col ? row.getCell(col).value : null
+    const header = scanSheetHeader(sheet, specAliases)
+    if (!header) continue
+    matchedSheets += 1
+
+    const columnMap = header.columnMap
+    const sheetHint = categoryBySheet.get(normalizeForSearch(sheet.name.trim()))
+    const maxRow = sheet.rowCount
+
+    for (let rowNumber = header.headerRow + 1; rowNumber <= maxRow; rowNumber++) {
+      if (errors.length >= 100) break
+      const row = sheet.getRow(rowNumber)
+      const get = (field: string): ExcelJS.CellValue => {
+        const col = columnMap.get(field)
+        return col ? row.getCell(col).value : null
+      }
+
+      const name = cellText(get('name'))
+      const categoryCell = cellText(get('category'))
+      if (!name) {
+        const hasData = Array.from(columnMap.values()).some((col) =>
+          cellText(row.getCell(col).value)
+        )
+        if (!hasData) continue
+        errors.push({ row: rowNumber, message: `[${sheet.name}] Thiếu tên thiết bị.` })
+        continue
+      }
+
+      try {
+        const categoryName = categoryCell || sheetHint?.name || ''
+        if (!categoryName) {
+          throw new Error('Thiếu danh mục thiết bị. Hãy chọn danh mục hoặc nhập vào đúng sheet.')
+        }
+        const category = findByCodeOrName(categories, categoryName)
+        if (!category) throw new Error(`Không tìm thấy danh mục "${categoryName}".`)
+
+        const departmentName = cellText(get('department'))
+        const department = departmentName ? findByCodeOrName(departments, departmentName) : undefined
+        if (departmentName && !department) {
+          throw new Error(`Không tìm thấy bộ phận "${departmentName}".`)
+        }
+        const locationName = cellText(get('location'))
+        const location = locationName ? findByCodeOrName(locations, locationName) : undefined
+        if (locationName && !location) throw new Error(`Không tìm thấy vị trí "${locationName}".`)
+        const employeeName = cellText(get('employee'))
+        const employee = employeeName ? findByCodeOrName(employees, employeeName) : undefined
+        if (employeeName && !employee) {
+          throw new Error(`Không tìm thấy nhân viên "${employeeName}".`)
+        }
+        const supplierName = cellText(get('supplier'))
+        const supplier = supplierName ? findByCodeOrName(suppliers, supplierName) : undefined
+        if (supplierName && !supplier) {
+          throw new Error(`Không tìm thấy nhà cung cấp "${supplierName}".`)
+        }
+
+        const statusText = cellText(get('status'))
+        const status = statusText ? STATUS_BY_LABEL.get(normalizeForSearch(statusText)) : undefined
+        if (statusText && !status) throw new Error(`Trạng thái "${statusText}" không hợp lệ.`)
+        const conditionText = cellText(get('condition'))
+        const condition = conditionText
+          ? CONDITION_BY_LABEL.get(normalizeForSearch(conditionText))
+          : undefined
+        if (conditionText && !condition) {
+          throw new Error(`Tình trạng "${conditionText}" không hợp lệ.`)
+        }
+
+        const purchaseDate = parseDateValue(get('purchaseDate'))
+        if (get('purchaseDate') && !purchaseDate) {
+          throw new Error('Ngày mua không hợp lệ (định dạng dd/mm/yyyy).')
+        }
+
+        const specs: Record<string, string | number> = {}
+        for (const field of category.specSchema) {
+          const col = columnMap.get(`spec:${field.key}`)
+          if (!col) continue
+          const raw = cellText(row.getCell(col).value)
+          if (!raw) continue
+          if (field.type === 'number') {
+            const number = parseSpecNumberValue(raw)
+            if (number === null) {
+              throw new Error(`${field.label} phải là số${field.unit ? ` (${field.unit})` : ''}.`)
+            }
+            specs[field.key] = number
+          } else if (field.type === 'select' && field.options?.length) {
+            const canonical = field.options.find(
+              (option) => normalizeForSearch(option) === normalizeForSearch(raw)
+            )
+            if (!canonical) {
+              throw new Error(
+                `${field.label} "${raw}" không hợp lệ. Giá trị hợp lệ: ${field.options.join(', ')}.`
+              )
+            }
+            specs[field.key] = canonical
+          } else {
+            specs[field.key] = raw
+          }
+        }
+
+        const input = {
+          code: cellText(get('code')) || undefined,
+          name,
+          categoryId: category.id,
+          serialNumber: cellText(get('serial')) || null,
+          model: cellText(get('model')) || null,
+          manufacturer: cellText(get('manufacturer')) || null,
+          status,
+          condition,
+          departmentId: department?.id ?? null,
+          locationId: location?.id ?? null,
+          assignedEmployeeId: employee?.id ?? null,
+          supplierId: supplier?.id ?? null,
+          purchaseDate,
+          purchasePrice: parseNumberValue(get('purchasePrice')),
+          invoiceNumber: cellText(get('invoice')) || null,
+          warrantyMonths: columnMap.has('warrantyMonths')
+            ? parseNumberValue(get('warrantyMonths'))
+            : undefined,
+          depreciationMonths: columnMap.has('depreciationMonths')
+            ? parseNumberValue(get('depreciationMonths'))
+            : undefined,
+          salvageValue: parseNumberValue(get('salvageValue')),
+          specs: Object.keys(specs).length > 0 ? specs : undefined,
+          note: cellText(get('note')) || null
+        }
+
+        const parsed = assetSchema.safeParse(input)
+        if (!parsed.success) {
+          throw new Error(parsed.error.issues.map((issue) => issue.message).join('; '))
+        }
+
+        createAsset(parsed.data as AssetInput, user)
+        imported++
+      } catch (error) {
+        errors.push({ row: rowNumber, message: `[${sheet.name}] ${messageOf(error)}` })
+      }
     }
-    const name = cellText(get('name'))
-    const categoryName = cellText(get('category'))
-    if (!name && !categoryName) continue
+  }
 
-    try {
-      if (!name) throw new Error('Thiếu tên thiết bị.')
-      if (!categoryName) throw new Error('Thiếu danh mục thiết bị.')
-      const category = findByCodeOrName(categories, categoryName)
-      if (!category) throw new Error(`Không tìm thấy danh mục "${categoryName}".`)
-      const departmentName = cellText(get('department'))
-      const department = departmentName ? findByCodeOrName(departments, departmentName) : undefined
-      if (departmentName && !department) throw new Error(`Không tìm thấy bộ phận "${departmentName}".`)
-      const locationName = cellText(get('location'))
-      const location = locationName ? findByCodeOrName(locations, locationName) : undefined
-      if (locationName && !location) throw new Error(`Không tìm thấy vị trí "${locationName}".`)
-      const employeeName = cellText(get('employee'))
-      const employee = employeeName ? findByCodeOrName(employees, employeeName) : undefined
-      if (employeeName && !employee) {
-        throw new Error(`Không tìm thấy nhân viên "${employeeName}".`)
-      }
-      const supplierName = cellText(get('supplier'))
-      const supplier = supplierName ? findByCodeOrName(suppliers, supplierName) : undefined
-      if (supplierName && !supplier) {
-        throw new Error(`Không tìm thấy nhà cung cấp "${supplierName}".`)
-      }
-
-      const statusText = cellText(get('status'))
-      const status = statusText ? STATUS_BY_LABEL.get(normalizeForSearch(statusText)) : undefined
-      if (statusText && !status) throw new Error(`Trạng thái "${statusText}" không hợp lệ.`)
-      const conditionText = cellText(get('condition'))
-      const condition = conditionText
-        ? CONDITION_BY_LABEL.get(normalizeForSearch(conditionText))
-        : undefined
-      if (conditionText && !condition) {
-        throw new Error(`Tình trạng "${conditionText}" không hợp lệ.`)
-      }
-
-      const purchaseDate = parseDateValue(get('purchaseDate'))
-      if (get('purchaseDate') && !purchaseDate) {
-        throw new Error('Ngày mua không hợp lệ (định dạng dd/mm/yyyy).')
-      }
-
-      const input = {
-        code: cellText(get('code')) || undefined,
-        name,
-        categoryId: category.id,
-        serialNumber: cellText(get('serial')) || null,
-        model: cellText(get('model')) || null,
-        manufacturer: cellText(get('manufacturer')) || null,
-        status,
-        condition,
-        departmentId: department?.id ?? null,
-        locationId: location?.id ?? null,
-        assignedEmployeeId: employee?.id ?? null,
-        supplierId: supplier?.id ?? null,
-        purchaseDate,
-        purchasePrice: parseNumberValue(get('purchasePrice')),
-        invoiceNumber: cellText(get('invoice')) || null,
-        warrantyMonths: columnMap.has('warrantyMonths')
-          ? parseNumberValue(get('warrantyMonths'))
-          : undefined,
-        depreciationMonths: columnMap.has('depreciationMonths')
-          ? parseNumberValue(get('depreciationMonths'))
-          : undefined,
-        salvageValue: parseNumberValue(get('salvageValue')),
-        note: cellText(get('note')) || null
-      }
-
-      const parsed = assetSchema.safeParse(input)
-      if (!parsed.success) {
-        throw new Error(parsed.error.issues.map((issue) => issue.message).join('; '))
-      }
-
-      createAsset(parsed.data as AssetInput, user)
-      imported++
-    } catch (error) {
-      errors.push({ row: rowNumber, message: messageOf(error) || 'Dữ liệu không hợp lệ.' })
+  if (matchedSheets === 0 && errors.length === 0) {
+    return {
+      canceled: false,
+      imported: 0,
+      failed: 1,
+      errors: [
+        {
+          row: 0,
+          message:
+            'Không tìm thấy dòng tiêu đề hợp lệ. Cần có cột "Tên thiết bị" và "Danh mục" (hoặc dùng mẫu tải từ phần mềm).'
+        }
+      ]
     }
   }
 
@@ -625,133 +1193,4 @@ export async function importAssetsExcel(user: AuthUser): Promise<ImportResult> {
     errors,
     filePath
   }
-}
-
-export async function downloadImportTemplate(user: AuthUser): Promise<ExportResult> {
-  const workbook = new ExcelJS.Workbook()
-  workbook.creator = 'Manager Device'
-  const sheet = workbook.addWorksheet('Nhập thiết bị')
-
-  sheet.columns = [
-    { width: 16 },
-    { width: 36 },
-    { width: 22 },
-    { width: 22 },
-    { width: 20 },
-    { width: 18 },
-    { width: 16 },
-    { width: 14 },
-    { width: 24 },
-    { width: 24 },
-    { width: 24 },
-    { width: 28 },
-    { width: 13 },
-    { width: 16 },
-    { width: 16 },
-    { width: 14 },
-    { width: 14 },
-    { width: 14 },
-    { width: 30 }
-  ]
-  const headers = [
-    'Mã thiết bị',
-    'Tên thiết bị (*)',
-    'Danh mục (*)',
-    'Serial',
-    'Model',
-    'Hãng sản xuất',
-    'Trạng thái',
-    'Tình trạng',
-    'Bộ phận',
-    'Vị trí',
-    'Người sử dụng',
-    'Nhà cung cấp',
-    'Ngày mua',
-    'Giá mua',
-    'Tháng bảo hành',
-    'Tháng khấu hao',
-    'Giá trị thanh lý',
-    'Số hóa đơn',
-    'Ghi chú'
-  ]
-  const headerRow = sheet.getRow(1)
-  headerRow.values = headers
-  styleHeader(headerRow)
-  sheet.getRow(1).height = 32
-
-  const sample = sheet.addRow([
-    '',
-    'Máy tính để bàn Dell OptiPlex 7010',
-    'Máy tính để bàn',
-    'DLL7010-2026-001',
-    'OptiPlex 7010',
-    'Dell',
-    'Sẵn sàng',
-    'Tốt',
-    'Phòng IT',
-    'Kho thiết bị IT',
-    '',
-    'Công ty CP Bán lẻ Kỹ thuật số FPT',
-    formatDate(todayISO()),
-    18500000,
-    36,
-    60,
-    0,
-    'HD-2026-001',
-    'Dòng ví dụ - hãy xóa trước khi nhập dữ liệu thật'
-  ])
-  sample.font = { italic: true, color: { argb: '64748B' } }
-  sample.getCell(14).numFmt = '#,##0'
-  sample.getCell(17).numFmt = '#,##0'
-
-  const statusList = Object.values(ASSET_STATUS_META)
-    .map((meta) => meta.label)
-    .join(',')
-  const conditionList = Object.values(ASSET_CONDITION_META)
-    .map((meta) => meta.label)
-    .join(',')
-  for (let row = 2; row <= 300; row++) {
-    sheet.getCell(`G${row}`).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: [`"${statusList}"`]
-    }
-    sheet.getCell(`H${row}`).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: [`"${conditionList}"`]
-    }
-  }
-
-  const guide = workbook.addWorksheet('Hướng dẫn')
-  guide.columns = [{ width: 30 }, { width: 80 }]
-  guide.addRow(['HƯỚNG DẪN NHẬP DỮ LIỆU']).font = { bold: true, size: 14 }
-  const guideRows: Array<[string, string]> = [
-    ['Tên thiết bị', 'Bắt buộc. Ví dụ: Máy in HP LaserJet Pro M404dn'],
-    ['Danh mục', 'Bắt buộc. Nhập đúng tên hoặc mã danh mục đã có trong hệ thống.'],
-    ['Mã thiết bị', 'Không bắt buộc. Để trống để hệ thống tự sinh theo tiền tố danh mục.'],
-    ['Trạng thái', `Một trong các giá trị: ${statusList}`],
-    ['Tình trạng', `Một trong các giá trị: ${conditionList}`],
-    ['Bộ phận / Vị trí / Người sử dụng / Nhà cung cấp', 'Nhập đúng tên hoặc mã đã có trong hệ thống.'],
-    ['Ngày mua', 'Định dạng dd/mm/yyyy hoặc yyyy-mm-dd.'],
-    ['Giá mua / Giá trị thanh lý', 'Nhập số tiền VND, có thể dùng dấu chấm phân cách.'],
-    ['Tháng bảo hành / Tháng khấu hao', 'Số tháng. Để trống để dùng giá trị mặc định của danh mục.'],
-    ['Quy trình', 'Tải mẫu → điền dữ liệu → xóa dòng ví dụ → lưu tệp .xlsx → vào phần mềm chọn Nhập Excel.'],
-    ['Lưu ý', 'Các dòng lỗi sẽ được báo chi tiết; các dòng hợp lệ vẫn được nhập bình thường.']
-  ]
-  for (const [label, value] of guideRows) {
-    const row = guide.addRow([label, value])
-    row.getCell(1).font = { bold: true }
-    row.getCell(2).alignment = { wrapText: true, vertical: 'top' }
-  }
-
-  const result = await savePath(
-    workbook,
-    'mau-nhap-thiet-bi.xlsx',
-    'Tải mẫu nhập thiết bị'
-  )
-  if (!result.canceled) {
-    logActivity(user, 'Tải mẫu nhập thiết bị Excel', 'asset', null, 'Mẫu nhập')
-  }
-  return result
 }
