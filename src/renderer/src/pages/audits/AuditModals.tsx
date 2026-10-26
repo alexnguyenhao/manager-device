@@ -133,12 +133,12 @@ export function AuditCreateModal({
         </Field>
         <div className="grid gap-3.5 sm:grid-cols-2">
           <Field
-            label="Bộ phận"
-            hint="Bỏ trống để kiểm kê tất cả bộ phận."
+            label="Phòng ban"
+            hint="Bỏ trống để kiểm kê tất cả phòng ban."
             htmlFor="audit-department"
           >
             <Select id="audit-department" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
-              <option value="">Tất cả bộ phận</option>
+              <option value="">Tất cả phòng ban</option>
               {departments.map((department) => (
                 <option key={department.id} value={department.id}>
                   {department.name}

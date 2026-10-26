@@ -3,22 +3,33 @@
 [![Release](https://img.shields.io/github/v/release/alexnguyenhao/manager-device?label=release)](https://github.com/alexnguyenhao/manager-device/releases/latest)
 [![Build](https://github.com/alexnguyenhao/manager-device/actions/workflows/build-release.yml/badge.svg)](https://github.com/alexnguyenhao/manager-device/actions/workflows/build-release.yml)
 
-Phần mềm quản lý thiết bị và tài sản CNTT chạy **hoàn toàn cục bộ** trên máy tính Windows/Linux. Ứng dụng giúp theo dõi toàn bộ vòng đời tài sản: tiếp nhận, cấu hình, cấp phát, bảo trì, kiểm kê, khấu hao và thanh lý — tất cả trong một giao diện tiếng Việt duy nhất.
+Phần mềm quản lý thiết bị và tài sản công dành cho **UBND cấp xã**, chạy **hoàn toàn cục bộ** trên máy tính Windows/Linux. Ứng dụng giúp theo dõi toàn bộ vòng đời tài sản: tiếp nhận, cấu hình, cấp phát, bảo trì, kiểm kê, khấu hao và thanh lý — tất cả trong một giao diện tiếng Việt duy nhất.
 
 Dữ liệu được lưu trong SQLite tại thư mục người dùng, không gửi lên máy chủ và không cần kết nối Internet.
 
 ---
 
+## Cơ cấu tổ chức
+
+Phòng ban, đơn vị được quản lý theo hai khối, phục vụ thống kê và báo cáo riêng:
+
+- **Khối Đảng** — Văn phòng Đảng ủy, Ban Xây dựng Đảng, Ủy ban Kiểm tra, Ủy ban Mặt trận Tổ quốc Việt Nam.
+- **Khối Nhà nước** — Văn phòng HĐND và UBND, Phòng Kinh tế, Phòng Văn hóa - Xã hội, Trung tâm Phục vụ Hành chính Công, Trung tâm Dịch vụ Tổng hợp.
+
+Có thể thêm, sửa hoặc ngừng sử dụng phòng ban tại **Cơ cấu tổ chức**. Mỗi thiết bị, nhân viên và báo cáo đều gắn với khối tương ứng.
+
+---
+
 ## Tính năng chính
 
-- **Bảng điều khiển** — KPI tài sản, giá trị còn lại, cảnh báo bảo hành/bảo trì, biểu đồ phân bố và hoạt động gần đây.
-- **Quản lý thiết bị** — Danh sách, tìm kiếm không phân biệt dấu (kể cả cấu hình CPU/RAM/ổ cứng), lọc nâng cao, sắp xếp, thêm/sửa/xóa, nhập và xuất Excel.
+- **Bảng điều khiển** — KPI tài sản, giá trị còn lại, cảnh báo bảo hành/bảo trì, cơ cấu tài sản theo Khối Đảng/Khối Nhà nước, biểu đồ phân bố và hoạt động gần đây.
+- **Quản lý thiết bị** — Danh sách, tìm kiếm không phân biệt dấu (kể cả cấu hình CPU/RAM/ổ cứng), lọc theo khối/phòng ban, sắp xếp, thêm/sửa/xóa, nhập và xuất Excel.
 - **Hồ sơ thiết bị** — Cấu hình chi tiết theo danh mục (CPU, RAM, GPU, dung lượng ổ cứng, hệ điều hành/Windows…), khấu hao, bảo hành, tệp đính kèm, lịch sử cấp phát/bảo trì/nhật ký.
-- **Cấp phát & thu hồi** — Bàn giao thiết bị cho nhân viên, theo dõi hạn trả, tình trạng trước/sau khi thu hồi.
+- **Cấp phát & thu hồi** — Bàn giao thiết bị cho cán bộ, công chức, theo dõi hạn trả, tình trạng trước/sau khi thu hồi.
 - **Bảo trì & sửa chữa** — Lập lịch, theo dõi tiến độ, chi phí, nhà cung cấp và lịch sử bảo dưỡng.
 - **Kiểm kê** — Tạo phiên kiểm kê, quét QR bằng webcam hoặc đầu đọc mã vạch, đối chiếu vị trí/người sử dụng, xuất kết quả.
-- **Danh mục** — Danh mục thiết bị với bộ thông số riêng, mẫu cấu hình dựng sẵn cho PC/Laptop/máy in/thiết bị mạng…, bộ phận, vị trí, nhà cung cấp, nhân viên.
-- **Báo cáo** — Tổng hợp theo danh mục/bộ phận/trạng thái, giá trị và khấu hao, xuất Excel.
+- **Danh mục** — Danh mục thiết bị với bộ thông số riêng, mẫu cấu hình dựng sẵn cho PC/Laptop/máy in/thiết bị mạng…, cơ cấu tổ chức, vị trí, nhà cung cấp, nhân viên.
+- **Báo cáo** — Tổng hợp theo khối/phòng ban/danh mục/trạng thái, giá trị và khấu hao, xuất Excel.
 - **Người dùng & phân quyền** — Bốn vai trò: quản trị viên, quản lý, nhân viên, chỉ xem; kiểm tra quyền ở tiến trình chính.
 - **Nhật ký hoạt động** — Ghi nhận tự động mọi thao tác, lọc theo người dùng, đối tượng và thời gian.
 - **Cài đặt & sao lưu** — Thông tin đơn vị, quy tắc cảnh báo, sao lưu/phục hồi cơ sở dữ liệu, xóa dữ liệu nghiệp vụ.
@@ -59,7 +70,7 @@ Bộ cài Windows (.exe) và AppImage Linux được tạo tự động bởi Gi
 
 **https://github.com/alexnguyenhao/manager-device/releases/latest**
 
-Tải `ManagerDevice-Setup-1.0.1.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng. File Excel mẫu nhập thiết bị cũng được đính kèm trong mục **Assets** của bản phát hành.
+Tải `ManagerDevice-Setup-1.0.2.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng. File Excel mẫu nhập thiết bị cũng được đính kèm trong mục **Assets** của bản phát hành.
 
 ---
 
@@ -113,12 +124,12 @@ File mẫu sẵn dùng: **`docs/ManagerDevice-Mau-Nhap-Thiet-Bi.xlsx`** (cũng t
 
 - Mỗi danh mục có một sheet riêng: Máy tính để bàn, Laptop, Máy in, Máy scan, Máy chiếu, Thiết bị mạng, Bộ lưu điện, Màn hình, Thiết bị khác.
 - Cột **Danh mục** tự lấy theo tên sheet nếu để trống.
-- **Dropdown** cho Danh mục, Trạng thái, Tình trạng, Bộ phận, Vị trí, Người sử dụng, Nhà cung cấp và các trường chọn (Loại RAM, Hệ điều hành, Cổng kết nối…).
+- **Dropdown** cho Danh mục, Trạng thái, Tình trạng, Phòng ban, Vị trí, Người sử dụng, Nhà cung cấp và các trường chọn (Loại RAM, Hệ điều hành, Cổng kết nối…).
 - Cột thông số kỹ thuật (CPU, RAM, GPU, ổ cứng, hệ điều hành, tốc độ in, khổ giấy…) khớp đúng `specSchema` của từng danh mục nên được lưu vào `specs` khi nhập.
 - Ô số (RAM, giá mua, tháng bảo hành…) chỉ nhận số; ngày mua theo `dd/mm/yyyy`.
 - Dòng trống được bỏ qua; dòng lỗi được báo kèm tên sheet và số dòng, các dòng hợp lệ vẫn được nhập.
 
-Tạo lại mẫu khi danh mục/bộ phận/nhân viên thay đổi:
+Tạo lại mẫu khi danh mục/phòng ban/nhân viên thay đổi:
 
 ```bash
 npm run template:excel
@@ -130,7 +141,7 @@ node scripts/generate-import-template.mjs --db "/path/to/manager-device.db" --ou
 
 ## Tài khoản dùng thử
 
-Lần chạy đầu tiên, ứng dụng tự tạo dữ liệu mẫu và 4 tài khoản:
+Lần chạy đầu tiên, ứng dụng tự tạo dữ liệu mẫu mô phỏng **UBND xã An Bình**: 9 phòng ban, đơn vị thuộc 2 khối, 18 cán bộ công chức, 25 thiết bị và 4 nhà cung cấp địa phương, cùng 4 tài khoản:
 
 | Tên đăng nhập | Mật khẩu | Vai trò |
 | --- | --- | --- |
@@ -257,4 +268,4 @@ managerDevice/
 
 ---
 
-© 2026 Manager Device · Phiên bản 1.0.0
+© 2026 Manager Device · Phiên bản 1.0.2

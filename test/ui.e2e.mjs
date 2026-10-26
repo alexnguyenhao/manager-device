@@ -182,7 +182,7 @@ async function main() {
     ['/maintenance', 'Bảo trì', '04-maintenance'],
     ['/audits', 'Kiểm kê', '05-audits'],
     ['/categories', 'Danh mục thiết bị', '06-categories'],
-    ['/departments', 'Bộ phận', '07-departments'],
+    ['/departments', 'Cơ cấu tổ chức', '07-departments'],
     ['/locations', 'Vị trí', '08-locations'],
     ['/suppliers', 'Nhà cung cấp', '09-suppliers'],
     ['/employees', 'Nhân viên', '10-employees'],

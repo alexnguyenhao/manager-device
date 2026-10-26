@@ -41,7 +41,7 @@ const EXPORT_HEADERS: Array<{ header: string; key: string; width: number }> = [
   { header: 'Hãng sản xuất', key: 'manufacturer', width: 16 },
   { header: 'Trạng thái', key: 'status', width: 16 },
   { header: 'Tình trạng', key: 'condition', width: 12 },
-  { header: 'Bộ phận', key: 'department', width: 24 },
+  { header: 'Phòng ban', key: 'department', width: 24 },
   { header: 'Vị trí', key: 'location', width: 24 },
   { header: 'Người sử dụng', key: 'employee', width: 24 },
   { header: 'Nhà cung cấp', key: 'supplier', width: 28 },
@@ -200,6 +200,12 @@ export async function exportReportExcel(params: ReportParams, user: AuthUser): P
   ])
   summary.addRow(['Tỷ lệ khấu hao', `${report.summary.depreciationRate}%`, '', ''])
   summary.addRow([])
+  summary.addRow(['Theo khối', 'Số lượng', 'Nguyên giá', 'Giá trị còn lại'])
+  styleHeader(summary.getRow(summary.rowCount))
+  for (const group of report.byBlock) {
+    summary.addRow([group.label, group.count, group.purchaseValue, group.currentValue])
+  }
+  summary.addRow([])
   const catStart = summary.rowCount + 1
   summary.addRow(['Theo danh mục', 'Số lượng', 'Nguyên giá', 'Giá trị còn lại'])
   styleHeader(summary.getRow(summary.rowCount))
@@ -207,7 +213,7 @@ export async function exportReportExcel(params: ReportParams, user: AuthUser): P
     summary.addRow([group.label, group.count, group.purchaseValue, group.currentValue])
   }
   summary.addRow([])
-  summary.addRow(['Theo bộ phận', 'Số lượng', 'Nguyên giá', 'Giá trị còn lại'])
+  summary.addRow(['Theo phòng ban', 'Số lượng', 'Nguyên giá', 'Giá trị còn lại'])
   styleHeader(summary.getRow(summary.rowCount))
   for (const group of report.byDepartment) {
     summary.addRow([group.label, group.count, group.purchaseValue, group.currentValue])
@@ -231,7 +237,7 @@ export async function exportReportExcel(params: ReportParams, user: AuthUser): P
     { header: 'Mã thiết bị', key: 'code', width: 16 },
     { header: 'Tên thiết bị', key: 'name', width: 36 },
     { header: 'Danh mục', key: 'category', width: 20 },
-    { header: 'Bộ phận', key: 'department', width: 22 },
+    { header: 'Phòng ban', key: 'department', width: 22 },
     { header: 'Vị trí', key: 'location', width: 22 },
     { header: 'Người sử dụng', key: 'employee', width: 22 },
     { header: 'Ngày mua', key: 'purchaseDate', width: 13 },
@@ -392,11 +398,11 @@ const COMMON_COLUMNS: TemplateColumn[] = [
     note: 'Chọn trong danh sách để tránh sai dữ liệu.'
   },
   {
-    header: 'Bộ phận',
+    header: 'Phòng ban',
     field: 'department',
     width: 24,
     kind: 'department',
-    note: 'Chọn trong danh sách. Để trống nếu chưa khai báo bộ phận.'
+    note: 'Chọn trong danh sách. Để trống nếu chưa khai báo phòng ban.'
   },
   {
     header: 'Vị trí',
@@ -573,7 +579,7 @@ export function buildImportTemplateWorkbook(): ExcelJS.Workbook {
     { header: 'Danh mục', values: categories.map((category) => category.name) },
     { header: 'Trạng thái', values: statusOptions },
     { header: 'Tình trạng', values: conditionOptions },
-    { header: 'Bộ phận', values: departments.map((item) => item.name) },
+    { header: 'Phòng ban', values: departments.map((item) => item.name) },
     { header: 'Vị trí', values: locations.map((item) => item.name) },
     { header: 'Nhà cung cấp', values: suppliers.map((item) => item.name) },
     { header: 'Nhân viên', values: employees.map((item) => item.fullName) }
@@ -662,7 +668,7 @@ export function buildImportTemplateWorkbook(): ExcelJS.Workbook {
         case 'supplier': {
           const key =
             column.kind === 'department'
-              ? 'Bộ phận'
+              ? 'Phòng ban'
               : column.kind === 'location'
                 ? 'Vị trí'
                 : column.kind === 'employee'
@@ -729,13 +735,13 @@ export function buildImportTemplateWorkbook(): ExcelJS.Workbook {
   bullet('Mỗi dòng là một thiết bị. Không sửa tên cột, không chèn dòng phía trên dòng tiêu đề.')
   bullet('Tên thiết bị là bắt buộc, tối thiểu 2 ký tự.')
   bullet('Cột Danh mục có thể để trống — hệ thống tự dùng đúng danh mục của sheet đang nhập.')
-  bullet('Trạng thái, Tình trạng, Bộ phận, Vị trí, Người sử dụng, Nhà cung cấp chỉ chọn từ dropdown để tránh sai dữ liệu.')
+  bullet('Trạng thái, Tình trạng, Phòng ban, Vị trí, Người sử dụng, Nhà cung cấp chỉ chọn từ dropdown để tránh sai dữ liệu.')
   bullet('Trạng thái "Đang sử dụng" bắt buộc phải chọn Người sử dụng. Nếu hệ thống chưa có nhân viên, trạng thái này sẽ không xuất hiện trong dropdown — hãy để trống hoặc chọn trạng thái khác.')
   bullet('Các cột thông số kỹ thuật (CPU, RAM, GPU, ổ cứng, hệ điều hành, tốc độ in…) có dropdown hoặc chỉ nhận số.')
   bullet('Ngày mua nhập dd/mm/yyyy. Tiền chỉ nhập số, không gõ "đ" hoặc dấu chấm phân cách.')
   bullet('Để trống Mã thiết bị nếu muốn hệ thống tự sinh mã theo danh mục.')
   bullet('Dòng trống được bỏ qua. Dòng lỗi sẽ được báo chi tiết, các dòng hợp lệ vẫn được nhập.')
-  bullet('Các cột Bộ phận/Vị trí/Người sử dụng/Nhà cung cấp: để trống nếu chưa khai báo trong hệ thống, hoặc chọn đúng giá trị có sẵn.')
+  bullet('Các cột Phòng ban/Vị trí/Người sử dụng/Nhà cung cấp: để trống nếu chưa khai báo trong hệ thống, hoặc chọn đúng giá trị có sẵn.')
   guide.addRow([])
 
   section('DANH MỤC TRONG MẪU')
@@ -767,7 +773,7 @@ export function buildImportTemplateWorkbook(): ExcelJS.Workbook {
   bullet('2. Lưu tệp dưới định dạng .xlsx.')
   bullet('3. Trong phần mềm: Thiết bị → Nhập Excel → chọn tệp vừa lưu.')
   bullet('4. Kiểm tra kết quả nhập; sửa các dòng báo lỗi rồi nhập lại nếu cần.')
-  bullet('Nếu danh mục hoặc bộ phận/vị trí/nhân viên thay đổi, hãy tải lại mẫu mới từ phần mềm để cập nhật dropdown.')
+  bullet('Nếu danh mục hoặc phòng ban/vị trí/nhân viên thay đổi, hãy tải lại mẫu mới từ phần mềm để cập nhật dropdown.')
 
   // Đưa sheet Hướng dẫn lên đầu để mở file là thấy ngay.
   ;(guide as unknown as { orderNo: number }).orderNo = 0
@@ -1066,7 +1072,7 @@ export async function importAssetsExcel(user: AuthUser): Promise<ImportResult> {
         const departmentName = cellText(get('department'))
         const department = departmentName ? findByCodeOrName(departments, departmentName) : undefined
         if (departmentName && !department) {
-          throw new Error(`Không tìm thấy bộ phận "${departmentName}".`)
+          throw new Error(`Không tìm thấy phòng ban "${departmentName}".`)
         }
         const locationName = cellText(get('location'))
         const location = locationName ? findByCodeOrName(locations, locationName) : undefined

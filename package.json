@@ -1,7 +1,7 @@
 {
   "name": "manager-device",
-  "version": "1.0.1",
-  "description": "Phần mềm quản lý thiết bị và tài sản CNTT chạy cục bộ",
+  "version": "1.0.2",
+  "description": "Phần mềm quản lý thiết bị và tài sản công dành cho UBND cấp xã",
   "main": "./out/main/index.js",
   "author": "Manager Device",
   "license": "MIT",
@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "dayjs": "^1.11.23",
     "exceljs": "^4.4.0",
     "zod": "^4.6.7"
   },

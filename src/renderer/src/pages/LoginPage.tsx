@@ -65,20 +65,20 @@ export function LoginPage() {
               <MonitorSmartphone className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-[17px] font-semibold text-white">Manager Device</p>
+              <p className="text-[17px] font-semibold text-white">Quản lý thiết bị UBND xã</p>
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-blue-100/80">
-                Quản lý tài sản nội bộ
+                Quản lý tài sản công
               </p>
             </div>
           </div>
 
           <div className="max-w-md">
             <h1 className="text-[34px] font-semibold leading-[1.15] tracking-[-0.03em] text-white xl:text-[40px]">
-              Quản lý thiết bị gọn gàng, chính xác và minh bạch.
+              Quản lý thiết bị của xã gọn gàng, chính xác và minh bạch.
             </h1>
             <p className="mt-4 text-[14.5px] leading-relaxed text-blue-100/85">
-              Theo dõi toàn bộ vòng đời tài sản CNTT: cấu hình, cấp phát, bảo trì, kiểm kê và khấu
-              hao — tất cả trên một màn hình duy nhất, dữ liệu lưu ngay trên máy của bạn.
+              Theo dõi toàn bộ vòng đời tài sản công: cấu hình, cấp phát, bảo trì, kiểm kê và khấu
+              hao — phục vụ Khối Đảng và Khối Nhà nước, dữ liệu lưu ngay trên máy của bạn.
             </p>
             <div className="mt-8 grid grid-cols-2 gap-3">
               {[
@@ -99,7 +99,7 @@ export function LoginPage() {
           </div>
 
           <p className="text-[11.5px] text-blue-100/60">
-            © {new Date().getFullYear()} Manager Device · Phiên bản 1.0.0 · Dữ liệu lưu cục bộ
+            © {new Date().getFullYear()} Quản lý thiết bị UBND xã · Phiên bản 1.0.2 · Dữ liệu lưu cục bộ
           </p>
         </div>
       </div>
@@ -111,8 +111,8 @@ export function LoginPage() {
               <MonitorSmartphone className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[15px] font-semibold text-slate-900 dark:text-white">Manager Device</p>
-              <p className="text-[10.5px] uppercase tracking-[0.14em] text-slate-400">Quản lý tài sản</p>
+              <p className="text-[15px] font-semibold text-slate-900 dark:text-white">Quản lý thiết bị UBND xã</p>
+              <p className="text-[10.5px] uppercase tracking-[0.14em] text-slate-400">Quản lý tài sản công</p>
             </div>
           </div>
 

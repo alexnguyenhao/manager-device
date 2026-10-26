@@ -27,11 +27,12 @@ import type {
   Category,
   Department,
   Location,
+  OrgBlock,
   ReportData,
   ReportGroup,
   ReportParams
 } from '@shared/types'
-import { ASSET_STATUS_META, hasPermission } from '@shared/constants'
+import { ASSET_STATUS_META, ORG_BLOCK_META, ORG_BLOCK_OPTIONS, hasPermission } from '@shared/constants'
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -145,6 +146,7 @@ export function ReportsPage() {
 
   const [categoryId, setCategoryId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
+  const [block, setBlock] = useState('')
   const [locationId, setLocationId] = useState('')
   const [status, setStatus] = useState<'all' | AssetStatus>('all')
   const [fromDate, setFromDate] = useState('')
@@ -159,12 +161,13 @@ export function ReportsPage() {
     () => ({
       categoryId: categoryId ? Number(categoryId) : null,
       departmentId: departmentId ? Number(departmentId) : null,
+      block: block ? (block as OrgBlock) : null,
       locationId: locationId ? Number(locationId) : null,
       status,
       fromDate: fromDate || null,
       toDate: toDate || null
     }),
-    [categoryId, departmentId, locationId, status, fromDate, toDate]
+    [categoryId, departmentId, block, locationId, status, fromDate, toDate]
   )
 
   useEffect(() => {
@@ -203,6 +206,7 @@ export function ReportsPage() {
   const activeFilterCount = [
     categoryId,
     departmentId,
+    block,
     locationId,
     status !== 'all' ? status : '',
     fromDate,
@@ -212,6 +216,7 @@ export function ReportsPage() {
   const resetFilters = (): void => {
     setCategoryId('')
     setDepartmentId('')
+    setBlock('')
     setLocationId('')
     setStatus('all')
     setFromDate('')
@@ -254,7 +259,7 @@ export function ReportsPage() {
     <div>
       <PageHeader
         title="Báo cáo tài sản"
-        description="Tổng hợp giá trị, khấu hao và phân bố tài sản theo danh mục, bộ phận và trạng thái."
+        description="Tổng hợp giá trị, khấu hao và phân bố tài sản theo khối, danh mục, phòng ban và trạng thái."
         icon={<BarChart3 className="h-5 w-5" />}
         meta={
           data ? (
@@ -291,7 +296,22 @@ export function ReportsPage() {
 
       <div className="card mb-3 p-3">
         <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center">
-          <div className="grid flex-1 grid-cols-2 gap-2 lg:grid-cols-4">
+          <div className="grid flex-1 grid-cols-2 gap-2 lg:grid-cols-5">
+            <Select
+              value={block}
+              onChange={(event) => {
+                setBlock(event.target.value)
+                setDepartmentId('')
+              }}
+              aria-label="Lọc theo khối"
+            >
+              <option value="">Tất cả các khối</option>
+              {ORG_BLOCK_OPTIONS.map((value) => (
+                <option key={value} value={value}>
+                  {ORG_BLOCK_META[value].label}
+                </option>
+              ))}
+            </Select>
             <Select
               value={categoryId}
               onChange={(event) => setCategoryId(event.target.value)}
@@ -307,14 +327,22 @@ export function ReportsPage() {
             <Select
               value={departmentId}
               onChange={(event) => setDepartmentId(event.target.value)}
-              aria-label="Lọc theo bộ phận"
+              aria-label="Lọc theo phòng ban"
             >
-              <option value="">Tất cả bộ phận</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
+              <option value="">Tất cả phòng ban</option>
+              {ORG_BLOCK_OPTIONS.filter((value) => !block || value === block).map((value) => {
+                const items = departments.filter((department) => department.block === value)
+                if (items.length === 0) return null
+                return (
+                  <optgroup key={value} label={ORG_BLOCK_META[value].label}>
+                    {items.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              })}
             </Select>
             <Select
               value={locationId}
@@ -393,7 +421,7 @@ export function ReportsPage() {
               value={formatNumber(data.summary.total)}
               icon={<Layers className="h-[18px] w-[18px]" />}
               tone="info"
-              hint={`${data.byCategory.length} danh mục · ${data.byDepartment.length} bộ phận`}
+              hint={`${data.byCategory.length} danh mục · ${data.byDepartment.length} phòng ban`}
             />
             <StatCard
               label="Nguyên giá"
@@ -547,7 +575,13 @@ export function ReportsPage() {
             </div>
           </div>
 
-          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+          <div className="mt-3 grid gap-3 xl:grid-cols-3">
+            <GroupTable
+              title="Tổng hợp theo khối"
+              description="Phân bổ tài sản giữa Khối Đảng và Khối Nhà nước"
+              groups={data.byBlock}
+              emptyText="Chưa có dữ liệu khối cơ quan"
+            />
             <GroupTable
               title="Tổng hợp theo danh mục"
               description="Số lượng và giá trị tài sản của từng loại thiết bị"
@@ -555,10 +589,10 @@ export function ReportsPage() {
               emptyText="Chưa có dữ liệu danh mục"
             />
             <GroupTable
-              title="Tổng hợp theo bộ phận"
+              title="Tổng hợp theo phòng ban"
               description="Phân bổ tài sản theo đơn vị sử dụng"
               groups={data.byDepartment}
-              emptyText="Chưa có dữ liệu bộ phận"
+              emptyText="Chưa có dữ liệu phòng ban"
             />
           </div>
 
@@ -574,7 +608,7 @@ export function ReportsPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Tìm mã, tên, bộ phận, nhân viên…"
+                placeholder="Tìm mã, tên, phòng ban, nhân viên…"
                 className="sm:w-[320px]"
               />
             </div>
@@ -602,7 +636,7 @@ export function ReportsPage() {
                     <tr>
                       <th>Thiết bị</th>
                       <th>Danh mục</th>
-                      <th>Bộ phận / Người dùng</th>
+                      <th>Phòng ban / Người dùng</th>
                       <th>Ngày mua</th>
                       <th className="text-right">Nguyên giá</th>
                       <th className="text-right">Còn lại</th>

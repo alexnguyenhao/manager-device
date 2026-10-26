@@ -28,6 +28,7 @@ import type {
   ExportResult,
   ImportResult,
   Location,
+  OrgBlock,
   PageResult,
   Supplier
 } from '@shared/types'
@@ -35,6 +36,8 @@ import {
   ASSET_CONDITION_META,
   ASSET_STATUS_META,
   DEFAULT_PAGE_SIZE,
+  ORG_BLOCK_META,
+  ORG_BLOCK_OPTIONS,
   hasPermission
 } from '@shared/constants'
 import {
@@ -69,6 +72,7 @@ interface Filters {
   categoryId: string
   status: 'all' | AssetStatus
   departmentId: string
+  block: string
   locationId: string
   warranty: boolean
 }
@@ -78,6 +82,7 @@ const EMPTY_FILTERS: Filters = {
   categoryId: '',
   status: 'all',
   departmentId: '',
+  block: '',
   locationId: '',
   warranty: false
 }
@@ -147,6 +152,7 @@ export function AssetsPage() {
         categoryId: filters.categoryId ? Number(filters.categoryId) : null,
         status: filters.status,
         departmentId: filters.departmentId ? Number(filters.departmentId) : null,
+        block: filters.block ? (filters.block as OrgBlock) : null,
         locationId: filters.locationId ? Number(filters.locationId) : null,
         warrantyExpiringDays: filters.warranty ? 45 : null,
         sortBy,
@@ -196,6 +202,7 @@ export function AssetsPage() {
     if (filters.categoryId) count++
     if (filters.status !== 'all') count++
     if (filters.departmentId) count++
+    if (filters.block) count++
     if (filters.locationId) count++
     if (filters.warranty) count++
     return count
@@ -290,6 +297,7 @@ export function AssetsPage() {
         categoryId: filters.categoryId ? Number(filters.categoryId) : null,
         status: filters.status,
         departmentId: filters.departmentId ? Number(filters.departmentId) : null,
+        block: filters.block ? (filters.block as OrgBlock) : null,
         locationId: filters.locationId ? Number(filters.locationId) : null,
         warrantyExpiringDays: filters.warranty ? 45 : null,
         sortBy,
@@ -403,14 +411,29 @@ export function AssetsPage() {
       />
 
       <div className="card mb-3 p-3">
-        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center">
+        <div className="flex flex-wrap items-center gap-2.5">
           <SearchInput
             value={searchInput}
             onChange={setSearchInput}
             placeholder="Tìm theo mã, tên, serial, người dùng…"
-            className="xl:w-[320px]"
+            className="w-full sm:w-[320px]"
           />
-          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="order-last grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+            <Select
+              value={filters.block}
+              onChange={(event) => {
+                setFilters((prev) => ({ ...prev, block: event.target.value, departmentId: '' }))
+                setPage(1)
+              }}
+              aria-label="Lọc theo khối"
+            >
+              <option value="">Tất cả các khối</option>
+              {ORG_BLOCK_OPTIONS.map((block) => (
+                <option key={block} value={block}>
+                  {ORG_BLOCK_META[block].label}
+                </option>
+              ))}
+            </Select>
             <Select
               value={filters.categoryId}
               onChange={(event) => {
@@ -447,14 +470,26 @@ export function AssetsPage() {
                 setFilters((prev) => ({ ...prev, departmentId: event.target.value }))
                 setPage(1)
               }}
-              aria-label="Lọc theo bộ phận"
+              aria-label="Lọc theo phòng ban"
             >
-              <option value="">Tất cả bộ phận</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
+              <option value="">Tất cả phòng ban</option>
+              {ORG_BLOCK_OPTIONS.filter((block) => !filters.block || block === filters.block).map(
+                (block) => {
+                  const items = departments.filter(
+                    (department) => department.block === block
+                  )
+                  if (items.length === 0) return null
+                  return (
+                    <optgroup key={block} label={ORG_BLOCK_META[block].label}>
+                      {items.map((department) => (
+                        <option key={department.id} value={department.id}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )
+                }
+              )}
             </Select>
             <Select
               value={filters.locationId}
@@ -472,7 +507,7 @@ export function AssetsPage() {
               ))}
             </Select>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => {

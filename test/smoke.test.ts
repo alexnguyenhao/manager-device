@@ -30,7 +30,7 @@ async function main(): Promise<void> {
     '../src/main/services/user.service'
   )
   const { listLogs } = await import('../src/main/services/log-list.service')
-  const { exportAssetsExcel, downloadImportTemplate, importAssetsExcel } = await import(
+  const { exportAssetsExcel, exportReportExcel, downloadImportTemplate, importAssetsExcel } = await import(
     '../src/main/services/excel.service'
   )
   const { findSpecPreset, getEffectiveSpecFields } = await import('../src/shared/spec-presets')
@@ -275,6 +275,13 @@ async function main(): Promise<void> {
     const template = await downloadImportTemplate(admin)
     if (template.canceled || !existsSync(templatePath)) throw new Error('Template failed')
 
+    const reportPath = `${savePath}.report.xlsx`
+    process.env.MD_TEST_SAVE = reportPath
+    const reportExport = await exportReportExcel({ status: 'all' }, admin)
+    if (reportExport.canceled || !existsSync(reportPath)) {
+      throw new Error('Report export failed')
+    }
+
     const importFile = join(dataDir, 'import.xlsx')
     const workbook = new ExcelJS.Workbook()
     const sheet = workbook.addWorksheet('Nhập thiết bị')
@@ -300,8 +307,8 @@ async function main(): Promise<void> {
       'IMPORT-SN-001',
       'Sẵn sàng',
       'Tốt',
-      'Phòng IT',
-      'Kho thiết bị IT',
+      'Phòng Kinh tế',
+      'Kho thiết bị',
       '',
       '01/10/2026',
       '5.500.000',

@@ -245,7 +245,14 @@ CREATE INDEX IF NOT EXISTS idx_logs_created ON activity_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_logs_entity ON activity_logs(entity_type, entity_id);
 `
 
-const MIGRATIONS: string[] = [SCHEMA_V1]
+const SCHEMA_V2 = /* sql */ `
+ALTER TABLE departments ADD COLUMN block TEXT NOT NULL DEFAULT 'state'
+  CHECK (block IN ('party','state'));
+
+CREATE INDEX IF NOT EXISTS idx_departments_block ON departments(block);
+`
+
+const MIGRATIONS: string[] = [SCHEMA_V1, SCHEMA_V2]
 
 export function openDatabase(): DatabaseSync {
   if (database) return database

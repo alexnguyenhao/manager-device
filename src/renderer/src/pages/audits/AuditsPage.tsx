@@ -232,7 +232,7 @@ export function AuditsPage() {
                       </td>
                       <td>
                         <p className="text-[12px] text-slate-600 dark:text-slate-300">
-                          {session.departmentName ?? 'Tất cả bộ phận'}
+                          {session.departmentName ?? 'Tất cả phòng ban'}
                         </p>
                         <p className="text-[10.5px] text-slate-400">
                           {session.locationName ?? 'Tất cả vị trí'}

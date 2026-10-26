@@ -226,7 +226,7 @@ export function AuditDetailPage() {
 
       <PageHeader
         title={session.name}
-        description={`Phạm vi: ${session.departmentName ?? 'Tất cả bộ phận'} · ${session.locationName ?? 'Tất cả vị trí'}`}
+        description={`Phạm vi: ${session.departmentName ?? 'Tất cả phòng ban'} · ${session.locationName ?? 'Tất cả vị trí'}`}
         icon={<ClipboardCheck className="h-5 w-5" />}
         meta={
           <>

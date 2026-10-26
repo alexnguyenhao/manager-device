@@ -74,10 +74,13 @@ export const categorySchema = z.object({
   isActive: z.boolean().optional()
 })
 
+const blockSchema = z.enum(['party', 'state'])
+
 export const departmentSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
-  code: z.string().trim().min(1, 'Vui lòng nhập mã bộ phận.').max(30),
-  name: z.string().trim().min(2, 'Vui lòng nhập tên bộ phận.').max(120),
+  code: z.string().trim().min(1, 'Vui lòng nhập mã phòng ban.').max(30),
+  name: z.string().trim().min(2, 'Vui lòng nhập tên phòng ban.').max(120),
+  block: blockSchema.default('state'),
   managerName: optionalText(100),
   phone: optionalText(30),
   description: optionalText(),
@@ -155,6 +158,7 @@ export const assetListSchema = z.object({
   search: z.string().trim().max(200).optional(),
   categoryId: optionalId,
   departmentId: optionalId,
+  block: blockSchema.nullable().optional(),
   locationId: optionalId,
   status: z.string().optional(),
   condition: z.string().optional(),
@@ -257,6 +261,7 @@ export const auditCompleteSchema = z.object({
 export const reportSchema = z.object({
   categoryId: optionalId,
   departmentId: optionalId,
+  block: blockSchema.nullable().optional(),
   locationId: optionalId,
   status: z.string().optional(),
   fromDate: dateString,

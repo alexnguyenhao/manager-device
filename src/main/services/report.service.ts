@@ -6,13 +6,14 @@ import type {
   ReportRow
 } from '../../shared/types'
 import { listAllAssets } from './asset.service'
-import { ASSET_STATUS_META } from '../../shared/constants'
+import { ASSET_STATUS_META, ORG_BLOCK_META } from '../../shared/constants'
 import { todayISO } from '../../shared/utils'
 
 export function buildReport(params: ReportParams): ReportData {
   let assets = listAllAssets({
     categoryId: params.categoryId,
     departmentId: params.departmentId,
+    block: params.block,
     locationId: params.locationId,
     status: (params.status as AssetStatus) ?? 'all',
     pageSize: 500
@@ -46,6 +47,7 @@ export function buildReport(params: ReportParams): ReportData {
   const accumulatedDepreciation = rows.reduce((sum, row) => sum + row.accumulatedDepreciation, 0)
 
   const categoryMap = new Map<string, ReportGroup>()
+  const blockMap = new Map<string, ReportGroup>()
   const departmentMap = new Map<string, ReportGroup>()
   const statusMap = new Map<string, ReportGroup>()
 
@@ -62,7 +64,7 @@ export function buildReport(params: ReportParams): ReportData {
     category.currentValue += asset.currentValue
     categoryMap.set(asset.categoryName, category)
 
-    const deptKey = asset.departmentName ?? 'Chưa phân bộ phận'
+    const deptKey = asset.departmentName ?? 'Chưa phân phòng ban'
     const department = departmentMap.get(deptKey) ?? {
       key: deptKey,
       label: deptKey,
@@ -74,6 +76,21 @@ export function buildReport(params: ReportParams): ReportData {
     department.purchaseValue += asset.purchasePrice
     department.currentValue += asset.currentValue
     departmentMap.set(deptKey, department)
+
+    if (asset.departmentBlock) {
+      const blockMeta = ORG_BLOCK_META[asset.departmentBlock]
+      const block = blockMap.get(asset.departmentBlock) ?? {
+        key: asset.departmentBlock,
+        label: blockMeta.label,
+        count: 0,
+        purchaseValue: 0,
+        currentValue: 0
+      }
+      block.count += 1
+      block.purchaseValue += asset.purchasePrice
+      block.currentValue += asset.currentValue
+      blockMap.set(asset.departmentBlock, block)
+    }
 
     const status = statusMap.get(asset.status) ?? {
       key: asset.status,
@@ -101,6 +118,7 @@ export function buildReport(params: ReportParams): ReportData {
       depreciationRate: purchaseValue > 0 ? Math.round((accumulatedDepreciation / purchaseValue) * 1000) / 10 : 0
     },
     byCategory: sortGroups(categoryMap),
+    byBlock: [...blockMap.values()].sort((a, b) => b.count - a.count),
     byDepartment: sortGroups(departmentMap),
     byStatus: sortGroups(statusMap),
     generatedAt: `${todayISO()}T${new Date().toTimeString().slice(0, 5)}:00`

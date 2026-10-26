@@ -11,7 +11,7 @@ import {
   Users
 } from 'lucide-react'
 import type { Department, Employee, EmployeeInput } from '@shared/types'
-import { hasPermission } from '@shared/constants'
+import { ORG_BLOCK_META, ORG_BLOCK_OPTIONS, hasPermission } from '@shared/constants'
 import { formatNumber } from '@shared/utils'
 import { api, errorMessage } from '../../lib/api'
 import { useCurrentUser } from '../../store/auth'
@@ -56,6 +56,7 @@ export function EmployeesPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState('')
+  const [blockFilter, setBlockFilter] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Employee | null>(null)
   const [form, setForm] = useState<EmployeeFormState>(EMPTY)
@@ -86,6 +87,7 @@ export function EmployeesPage() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     return items.filter((item) => {
+      if (blockFilter && item.departmentBlock !== blockFilter) return false
       if (departmentFilter && String(item.departmentId) !== departmentFilter) return false
       if (!term) return true
       return (
@@ -96,7 +98,17 @@ export function EmployeesPage() {
         (item.position ?? '').toLowerCase().includes(term)
       )
     })
-  }, [items, search, departmentFilter])
+  }, [items, search, departmentFilter, blockFilter])
+
+  const departmentsByBlock = useMemo(
+    () =>
+      ORG_BLOCK_OPTIONS.map((block) => ({
+        block,
+        meta: ORG_BLOCK_META[block],
+        items: departments.filter((department) => department.block === block)
+      })).filter((group) => group.items.length > 0),
+    [departments]
+  )
 
   const openCreate = (): void => {
     setEditing(null)
@@ -197,20 +209,42 @@ export function EmployeesPage() {
             value={search}
             onChange={setSearch}
             placeholder="Tìm theo tên, mã, email, số điện thoại…"
-            className="sm:w-[360px]"
+            className="sm:w-[320px]"
           />
+          <Select
+            value={blockFilter}
+            onChange={(event) => {
+              setBlockFilter(event.target.value)
+              setDepartmentFilter('')
+            }}
+            className="sm:w-[190px]"
+            aria-label="Lọc theo khối"
+          >
+            <option value="">Tất cả các khối</option>
+            {ORG_BLOCK_OPTIONS.map((block) => (
+              <option key={block} value={block}>
+                {ORG_BLOCK_META[block].label}
+              </option>
+            ))}
+          </Select>
           <Select
             value={departmentFilter}
             onChange={(event) => setDepartmentFilter(event.target.value)}
             className="sm:w-[240px]"
-            aria-label="Lọc theo bộ phận"
+            aria-label="Lọc theo phòng ban"
           >
-            <option value="">Tất cả bộ phận</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
+            <option value="">Tất cả phòng ban</option>
+            {departmentsByBlock
+              .filter((group) => !blockFilter || group.block === blockFilter)
+              .map((group) => (
+                <optgroup key={group.block} label={group.meta.label}>
+                  {group.items.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
           </Select>
         </div>
       </div>
@@ -221,14 +255,14 @@ export function EmployeesPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Users className="h-6 w-6" />}
-            title={search || departmentFilter ? 'Không tìm thấy nhân viên' : 'Chưa có nhân viên'}
+            title={search || departmentFilter || blockFilter ? 'Không tìm thấy nhân viên' : 'Chưa có nhân viên'}
             description={
-              search || departmentFilter
+              search || departmentFilter || blockFilter
                 ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.'
                 : 'Thêm nhân viên để bắt đầu cấp phát thiết bị.'
             }
             action={
-              canWrite && !search && !departmentFilter ? (
+              canWrite && !search && !departmentFilter && !blockFilter ? (
                 <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
                   Thêm nhân viên
                 </Button>
@@ -241,7 +275,8 @@ export function EmployeesPage() {
               <tr>
                 <th>Nhân viên</th>
                 <th>Chức vụ</th>
-                <th>Bộ phận</th>
+                <th>Phòng ban</th>
+                <th>Khối</th>
                 <th>Liên hệ</th>
                 <th>Thiết bị</th>
                 <th>Trạng thái</th>
@@ -273,6 +308,15 @@ export function EmployeesPage() {
                     <span className="text-[12px] text-slate-600 dark:text-slate-300">
                       {employee.departmentName ?? '—'}
                     </span>
+                  </td>
+                  <td>
+                    {employee.departmentBlock ? (
+                      <Badge tone={ORG_BLOCK_META[employee.departmentBlock].tone}>
+                        {ORG_BLOCK_META[employee.departmentBlock].shortLabel}
+                      </Badge>
+                    ) : (
+                      <span className="text-[12px] text-slate-400">—</span>
+                    )}
                   </td>
                   <td>
                     {employee.email && (
@@ -387,17 +431,21 @@ export function EmployeesPage() {
                 onChange={(event) => update('position', event.target.value)}
               />
             </Field>
-            <Field label="Bộ phận" htmlFor="emp-department">
+            <Field label="Phòng ban" htmlFor="emp-department">
               <Select
                 id="emp-department"
                 value={form.departmentId}
                 onChange={(event) => update('departmentId', event.target.value)}
               >
-                <option value="">Chưa phân bộ phận</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
+                <option value="">Chưa phân phòng ban</option>
+                {departmentsByBlock.map((group) => (
+                  <optgroup key={group.block} label={group.meta.label}>
+                    {group.items.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </Select>
             </Field>

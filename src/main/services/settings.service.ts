@@ -10,7 +10,7 @@ import { logActivity } from './log.service'
 import { nowISO } from '../../shared/utils'
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  companyName: 'Công ty của bạn',
+  companyName: 'Ủy ban nhân dân xã',
   companyAddress: '',
   companyPhone: '',
   companyEmail: '',
@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   warrantyWarningDays: 30,
   maintenanceWarningDays: 14,
   defaultDepreciationMonths: 60,
-  loginNotice: 'Hệ thống quản lý thiết bị nội bộ'
+  loginNotice: 'Hệ thống quản lý thiết bị và tài sản công của UBND xã'
 }
 
 const KEY_MAP: Record<keyof AppSettings, string> = {

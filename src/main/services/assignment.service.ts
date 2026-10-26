@@ -199,7 +199,13 @@ export function createAssignment(data: AssignmentInput, user: AuthUser): Assignm
     throw conflict('Ngày dự kiến thu hồi phải sau ngày cấp phát.')
   }
 
-  const departmentId = data.departmentId ?? (employee.department_id ? Number(employee.department_id) : null)
+  const departmentId =
+    data.departmentId ?? (employee.department_id ? Number(employee.department_id) : null)
+  const departmentName = departmentId
+    ? ((db.prepare('SELECT name FROM departments WHERE id = ?').get(departmentId) as
+        | { name: string }
+        | undefined)?.name ?? null)
+    : null
   const now = nowISO()
 
   let assignmentId = 0
@@ -227,7 +233,7 @@ export function createAssignment(data: AssignmentInput, user: AuthUser): Assignm
     'assignment',
     assignmentId,
     `${asset.code} → ${employee.full_name}`,
-    `${asset.name}${departmentId ? `, bộ phận ${departmentId}` : ''}`
+    `${asset.name}${departmentName ? `, ${departmentName}` : ''}`
   )
   return getAssignment(assignmentId)
 }

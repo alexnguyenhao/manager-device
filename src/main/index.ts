@@ -22,7 +22,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#f4f6fb',
-    title: 'Quản lý thiết bị',
+    title: 'Quản lý thiết bị UBND xã',
     icon: join(__dirname, '../../build/icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

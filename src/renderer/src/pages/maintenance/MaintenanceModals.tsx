@@ -210,7 +210,7 @@ export function MaintenanceFormModal({
             {selectedAsset && (
               <p className="mt-1.5 text-[11.5px] text-slate-400">
                 Đang chọn <strong className="text-slate-600 dark:text-slate-300">{selectedAsset.code}</strong> ·{' '}
-                {selectedAsset.departmentName ?? 'Chưa phân bộ phận'} · {selectedAsset.locationName ?? 'Chưa có vị trí'}
+                {selectedAsset.departmentName ?? 'Chưa phân phòng ban'} · {selectedAsset.locationName ?? 'Chưa có vị trí'}
               </p>
             )}
           </div>

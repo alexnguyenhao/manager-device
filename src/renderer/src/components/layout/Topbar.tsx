@@ -30,7 +30,7 @@ function usePageTitle(): string {
   if (exact) return exact.label
   if (pathname.startsWith('/assets/')) return 'Chi tiết thiết bị'
   if (pathname.startsWith('/audits/')) return 'Chi tiết kiểm kê'
-  return 'Manager Device'
+  return 'Quản lý thiết bị UBND xã'
 }
 
 export function Topbar() {

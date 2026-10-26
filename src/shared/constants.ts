@@ -7,8 +7,35 @@ import type {
   MaintenancePriority,
   MaintenanceStatus,
   MaintenanceType,
+  OrgBlock,
   Role
 } from './types'
+
+/* ------------------------------- Tổ chức ------------------------------- */
+
+export interface OrgBlockMeta {
+  label: string
+  shortLabel: string
+  tone: Tone
+  description: string
+}
+
+export const ORG_BLOCK_META: Record<OrgBlock, OrgBlockMeta> = {
+  party: {
+    label: 'Khối Đảng',
+    shortLabel: 'Đảng',
+    tone: 'danger',
+    description: 'Các cơ quan, đơn vị thuộc Khối Đảng'
+  },
+  state: {
+    label: 'Khối Nhà nước',
+    shortLabel: 'Nhà nước',
+    tone: 'info',
+    description: 'Các phòng ban, đơn vị thuộc Khối Nhà nước'
+  }
+}
+
+export const ORG_BLOCK_OPTIONS: OrgBlock[] = ['party', 'state']
 
 /* ------------------------------- Roles --------------------------------- */
 
@@ -173,7 +200,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   maintenance: 'Bảo trì',
   audit: 'Kiểm kê',
   category: 'Danh mục',
-  department: 'Bộ phận',
+  department: 'Phòng ban, đơn vị',
   location: 'Vị trí',
   supplier: 'Nhà cung cấp',
   employee: 'Nhân viên',

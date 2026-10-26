@@ -32,10 +32,10 @@ export function Sidebar() {
         {!collapsed && (
           <div className="min-w-0 leading-tight">
             <p className="truncate text-[14.5px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-white">
-              Manager Device
+              Quản lý thiết bị
             </p>
             <p className="truncate text-[10.5px] font-medium uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
-              Quản lý tài sản
+              UBND xã
             </p>
           </div>
         )}

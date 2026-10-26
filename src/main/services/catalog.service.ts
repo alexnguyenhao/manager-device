@@ -148,6 +148,7 @@ function mapDepartment(row: Record<string, unknown>): Department {
     id: Number(row.id),
     code: String(row.code),
     name: String(row.name),
+    block: (row.block as Department['block']) ?? 'state',
     managerName: (row.manager_name as string | null) ?? null,
     phone: (row.phone as string | null) ?? null,
     description: (row.description as string | null) ?? null,
@@ -165,7 +166,8 @@ export function listDepartments(): Department[] {
       `SELECT d.*,
         (SELECT COUNT(*) FROM assets a WHERE a.department_id = d.id) AS asset_count,
         (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id) AS employee_count
-       FROM departments d ORDER BY d.name`
+       FROM departments d
+       ORDER BY CASE d.block WHEN 'party' THEN 0 ELSE 1 END, d.name`
     )
     .all() as Array<Record<string, unknown>>
   return rows.map(mapDepartment)
@@ -178,23 +180,26 @@ export function saveDepartment(data: DepartmentInput & { id?: number }, user: Au
   const duplicate = db
     .prepare('SELECT id FROM departments WHERE UPPER(code) = ? AND id <> ?')
     .get(code, data.id ?? 0)
-  if (duplicate) throw conflict('Mã bộ phận đã được sử dụng.')
+  if (duplicate) throw conflict('Mã phòng ban đã được sử dụng.')
   const nameDuplicate = db
     .prepare('SELECT id FROM departments WHERE LOWER(name) = LOWER(?) AND id <> ?')
     .get(data.name.trim(), data.id ?? 0)
-  if (nameDuplicate) throw conflict('Tên bộ phận đã tồn tại.')
+  if (nameDuplicate) throw conflict('Tên phòng ban đã tồn tại.')
+
+  const block = data.block === 'party' ? 'party' : 'state'
 
   let id = data.id ?? 0
   if (data.id) {
     if (!db.prepare('SELECT id FROM departments WHERE id = ?').get(data.id)) {
-      throw notFound('bộ phận')
+      throw notFound('phòng ban')
     }
     db.prepare(
-      `UPDATE departments SET code = ?, name = ?, manager_name = ?, phone = ?, description = ?,
+      `UPDATE departments SET code = ?, name = ?, block = ?, manager_name = ?, phone = ?, description = ?,
         is_active = ?, updated_at = ? WHERE id = ?`
     ).run(
       code,
       data.name.trim(),
+      block,
       data.managerName ?? null,
       data.phone ?? null,
       data.description ?? null,
@@ -205,12 +210,13 @@ export function saveDepartment(data: DepartmentInput & { id?: number }, user: Au
   } else {
     const result = db
       .prepare(
-        `INSERT INTO departments (code, name, manager_name, phone, description, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO departments (code, name, block, manager_name, phone, description, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         code,
         data.name.trim(),
+        block,
         data.managerName ?? null,
         data.phone ?? null,
         data.description ?? null,
@@ -223,7 +229,7 @@ export function saveDepartment(data: DepartmentInput & { id?: number }, user: Au
   refreshAllAssetSearch()
   logActivity(
     user,
-    data.id ? 'Cập nhật bộ phận' : 'Tạo bộ phận',
+    data.id ? 'Cập nhật phòng ban, đơn vị' : 'Tạo phòng ban, đơn vị',
     'department',
     id,
     `${code} - ${data.name}`
@@ -236,7 +242,7 @@ export function deleteDepartment(id: number, user: AuthUser): void {
   const row = db.prepare('SELECT code, name FROM departments WHERE id = ?').get(id) as
     | { code: string; name: string }
     | undefined
-  if (!row) throw notFound('bộ phận')
+  if (!row) throw notFound('phòng ban')
   const usage = db
     .prepare(
       `SELECT
@@ -245,10 +251,10 @@ export function deleteDepartment(id: number, user: AuthUser): void {
     )
     .get(id, id) as { assets: number; employees: number }
   if (Number(usage.assets) > 0 || Number(usage.employees) > 0) {
-    throw conflict('Bộ phận đang được sử dụng, không thể xóa.')
+    throw conflict('Phòng ban đang được sử dụng, không thể xóa.')
   }
   db.prepare('DELETE FROM departments WHERE id = ?').run(id)
-  logActivity(user, 'Xóa bộ phận', 'department', id, `${row.code} - ${row.name}`)
+  logActivity(user, 'Xóa phòng ban, đơn vị', 'department', id, `${row.code} - ${row.name}`)
 }
 
 /* ------------------------------- Locations ----------------------------- */
@@ -484,6 +490,7 @@ function mapEmployee(row: Record<string, unknown>): Employee {
     position: (row.position as string | null) ?? null,
     departmentId: row.department_id ? Number(row.department_id) : null,
     departmentName: (row.department_name as string | null) ?? null,
+    departmentBlock: (row.department_block as Employee['departmentBlock']) ?? null,
     isActive: Boolean(row.is_active),
     note: (row.note as string | null) ?? null,
     assetCount: Number(row.asset_count) || 0,
@@ -495,7 +502,7 @@ function mapEmployee(row: Record<string, unknown>): Employee {
 export function listEmployees(): Employee[] {
   const rows = getDb()
     .prepare(
-      `SELECT e.*, d.name AS department_name,
+      `SELECT e.*, d.name AS department_name, d.block AS department_block,
         (SELECT COUNT(*) FROM assets a WHERE a.assigned_employee_id = e.id) AS asset_count
        FROM employees e LEFT JOIN departments d ON d.id = e.department_id
        ORDER BY e.full_name`

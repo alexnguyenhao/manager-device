@@ -25,7 +25,9 @@ import type {
 } from '@shared/types'
 import {
   ASSET_CONDITION_META,
-  ASSET_STATUS_META
+  ASSET_STATUS_META,
+  ORG_BLOCK_META,
+  ORG_BLOCK_OPTIONS
 } from '@shared/constants'
 import {
   findSpecPreset,
@@ -478,7 +480,7 @@ export function AssetFormDrawer({
             <SectionTitle
               icon={<UserRound className="h-4 w-4" />}
               title="Phân bổ & sử dụng"
-              description="Gán thiết bị cho nhân viên, bộ phận và vị trí."
+              description="Gán thiết bị cho nhân viên, phòng ban và vị trí."
             />
             <div className="grid gap-3.5 sm:grid-cols-2">
               <Field label="Trạng thái" htmlFor="asset-status">
@@ -524,24 +526,31 @@ export function AssetFormDrawer({
                     ))}
                 </Select>
               </Field>
-              <Field label="Bộ phận" htmlFor="asset-department">
+              <Field label="Phòng ban" htmlFor="asset-department">
                 <Select
                   id="asset-department"
                   value={form.departmentId}
                   onChange={(event) => update('departmentId', event.target.value)}
                 >
-                  <option value="">Chưa phân bộ phận</option>
-                  {departments
-                    .filter(
+                  <option value="">Chưa phân phòng ban</option>
+                  {ORG_BLOCK_OPTIONS.map((block) => {
+                    const items = departments.filter(
                       (department) =>
-                        department.isActive || String(department.id) === form.departmentId
+                        department.block === block &&
+                        (department.isActive || String(department.id) === form.departmentId)
                     )
-                    .map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name}
-                        {department.isActive ? '' : ' (ngừng dùng)'}
-                      </option>
-                    ))}
+                    if (items.length === 0) return null
+                    return (
+                      <optgroup key={block} label={ORG_BLOCK_META[block].label}>
+                        {items.map((department) => (
+                          <option key={department.id} value={department.id}>
+                            {department.name}
+                            {department.isActive ? '' : ' (ngừng dùng)'}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )
+                  })}
                 </Select>
               </Field>
               <Field label="Vị trí" htmlFor="asset-location">

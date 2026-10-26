@@ -304,7 +304,7 @@ export function SettingsPage() {
                   id="set-company-name"
                   value={draft.companyName}
                   disabled={!canWrite}
-                  placeholder="Công ty TNHH ABC"
+                  placeholder="Ủy ban nhân dân xã An Bình"
                   onChange={(event) => update('companyName', event.target.value)}
                 />
               </Field>
@@ -313,7 +313,7 @@ export function SettingsPage() {
                   id="set-tax"
                   value={draft.companyTaxCode}
                   disabled={!canWrite}
-                  placeholder="0101234567"
+                  placeholder="5701234567"
                   onChange={(event) => update('companyTaxCode', event.target.value)}
                 />
               </Field>
@@ -322,7 +322,7 @@ export function SettingsPage() {
                   id="set-phone"
                   value={draft.companyPhone}
                   disabled={!canWrite}
-                  placeholder="024 xxxx xxxx"
+                  placeholder="0229 xxxx xxx"
                   onChange={(event) => update('companyPhone', event.target.value)}
                 />
               </Field>
@@ -332,7 +332,7 @@ export function SettingsPage() {
                   type="email"
                   value={draft.companyEmail}
                   disabled={!canWrite}
-                  placeholder="lienhe@congty.vn"
+                  placeholder="ubnd@anbinh.gov.vn"
                   onChange={(event) => update('companyEmail', event.target.value)}
                 />
               </Field>
@@ -341,7 +341,7 @@ export function SettingsPage() {
                   id="set-website"
                   value={draft.companyWebsite}
                   disabled={!canWrite}
-                  placeholder="https://congty.vn"
+                  placeholder="https://anbinh.gov.vn"
                   onChange={(event) => update('companyWebsite', event.target.value)}
                 />
               </Field>
@@ -350,7 +350,7 @@ export function SettingsPage() {
                   id="set-address"
                   value={draft.companyAddress}
                   disabled={!canWrite}
-                  placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
+                  placeholder="Số nhà, đường, thôn/xóm, xã, huyện, tỉnh/thành phố"
                   onChange={(event) => update('companyAddress', event.target.value)}
                 />
               </Field>

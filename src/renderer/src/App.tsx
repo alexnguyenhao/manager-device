@@ -37,7 +37,7 @@ function BootScreen() {
         <MonitorSmartphone className="h-7 w-7" />
       </div>
       <div className="text-center">
-        <p className="text-[15px] font-semibold text-slate-800 dark:text-slate-100">Manager Device</p>
+        <p className="text-[15px] font-semibold text-slate-800 dark:text-slate-100">Quản lý thiết bị UBND xã</p>
         <p className="mt-0.5 text-[12px] text-slate-400">Đang khởi động hệ thống…</p>
       </div>
       <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600 dark:border-slate-700 dark:border-t-brand-400" />

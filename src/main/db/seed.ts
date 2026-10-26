@@ -63,18 +63,18 @@ export function seedDatabase(database: DatabaseSync): void {
 function seedSettings(): void {
   const now = nowISO()
   const settings: Record<string, string> = {
-    company_name: 'CÔNG TY TNHH CÔNG NGHỆ ABC',
-    company_address: 'Số 18 Nguyễn Chí Thanh, Đống Đa, Hà Nội',
-    company_phone: '024 3974 1234',
-    company_email: 'info@abc.vn',
-    company_tax_code: '0101234567',
-    company_website: 'https://abc.vn',
+    company_name: 'ỦY BAN NHÂN DÂN XÃ AN BÌNH',
+    company_address: 'Số 01, đường Trần Phú, xã An Bình',
+    company_phone: '0229 3861 234',
+    company_email: 'ubnd@anbinh.gov.vn',
+    company_tax_code: '5701234567',
+    company_website: 'https://anbinh.gov.vn',
     currency: 'VND',
     date_format: 'DD/MM/YYYY',
     warranty_warning_days: '30',
     maintenance_warning_days: '14',
     default_depreciation_months: '60',
-    login_notice: 'Hệ thống quản lý thiết bị nội bộ'
+    login_notice: 'Hệ thống quản lý thiết bị của UBND xã An Bình'
   }
   const stmt = db.prepare(
     'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING'
@@ -85,10 +85,10 @@ function seedSettings(): void {
 function seedUsers(): Record<string, number> {
   const now = nowISO()
   const rows: Array<[string, string, string, string, string, string]> = [
-    ['admin', 'Admin@123', 'Nguyễn Minh Quân', 'admin@abc.vn', 'admin', '0901 234 567'],
-    ['manager', 'Manager@123', 'Trần Thị Bích', 'bich.tran@abc.vn', 'manager', '0902 345 678'],
-    ['staff', 'Staff@123', 'Bùi Quang Huy', 'huy.bui@abc.vn', 'staff', '0903 456 789'],
-    ['viewer', 'Viewer@123', 'Đỗ Thị Hương', 'huong.do@abc.vn', 'viewer', '0904 567 890']
+    ['admin', 'Admin@123', 'Nguyễn Minh Quân', 'quan.nguyen@anbinh.gov.vn', 'admin', '0901 234 567'],
+    ['manager', 'Manager@123', 'Trần Thị Bích', 'bich.tran@anbinh.gov.vn', 'manager', '0902 345 678'],
+    ['staff', 'Staff@123', 'Bùi Quang Huy', 'huy.bui@anbinh.gov.vn', 'staff', '0903 456 789'],
+    ['viewer', 'Viewer@123', 'Đỗ Thị Hương', 'huong.do@anbinh.gov.vn', 'viewer', '0904 567 890']
   ]
   const result: Record<string, number> = {}
   for (const [username, password, fullName, email, role, phone] of rows) {
@@ -103,20 +103,23 @@ function seedUsers(): Record<string, number> {
 
 function seedDepartments(): Record<string, number> {
   const now = nowISO()
-  const rows: Array<[string, string, string, string, string]> = [
-    ['BGD', 'Ban Giám đốc', 'Nguyễn Minh Quân', '024 3974 1234', 'Điều hành và quản lý chung'],
-    ['HCNS', 'Hành chính - Nhân sự', 'Phạm Thu Hà', '024 3974 1235', 'Quản trị nhân sự và hành chính'],
-    ['KT', 'Phòng Kế toán', 'Trần Thị Bích', '024 3974 1236', 'Kế toán, tài chính'],
-    ['KD', 'Phòng Kinh doanh', 'Hoàng Văn Nam', '024 3974 1237', 'Kinh doanh và chăm sóc khách hàng'],
-    ['IT', 'Phòng IT', 'Nguyễn Văn An', '024 3974 1238', 'Hạ tầng và hỗ trợ kỹ thuật'],
-    ['KT-QL', 'Phòng Kỹ thuật', 'Vũ Đức Long', '024 3974 1239', 'Thi công và kỹ thuật dự án']
+  const rows: Array<[string, string, string, string, string, string]> = [
+    ['VP-DU', 'Văn phòng Đảng ủy', 'party', 'Lê Hoàng Minh', '0229 3861 235', 'Tham mưu, tổng hợp phục vụ Đảng ủy'],
+    ['BXD-D', 'Ban Xây dựng Đảng', 'party', 'Trần Thị Bích', '0229 3861 236', 'Tham mưu công tác xây dựng Đảng'],
+    ['UBKT', 'Ủy ban Kiểm tra', 'party', 'Phạm Thu Hà', '0229 3861 237', 'Kiểm tra, giám sát theo quy định của Đảng'],
+    ['MTTQ', 'Ủy ban Mặt trận Tổ quốc Việt Nam', 'party', 'Đặng Thị Mai', '0229 3861 238', 'Vận động quần chúng, giám sát và phản biện xã hội'],
+    ['VP', 'Văn phòng HĐND và UBND', 'state', 'Nguyễn Minh Quân', '0229 3861 239', 'Tổng hợp, hành chính, quản trị nội bộ'],
+    ['KT', 'Phòng Kinh tế', 'state', 'Hoàng Văn Nam', '0229 3861 240', 'Quản lý kinh tế, đất đai, xây dựng và tài chính'],
+    ['VHXH', 'Phòng Văn hóa - Xã hội', 'state', 'Ngô Thị Lan', '0229 3861 241', 'Văn hóa, giáo dục, y tế và chính sách xã hội'],
+    ['PVHCC', 'Trung tâm Phục vụ Hành chính Công', 'state', 'Vũ Đức Long', '0229 3861 242', 'Tiếp nhận và trả kết quả thủ tục hành chính'],
+    ['DVTH', 'Trung tâm Dịch vụ Tổng hợp', 'state', 'Bùi Quang Huy', '0229 3861 243', 'Cung cấp dịch vụ công ích và hỗ trợ vận hành']
   ]
   const result: Record<string, number> = {}
-  for (const [code, name, manager, phone, description] of rows) {
+  for (const [code, name, block, manager, phone, description] of rows) {
     result[code] = insert(
-      `INSERT INTO departments (code, name, manager_name, phone, description, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
-      [code, name, manager, phone, description, now, now]
+      `INSERT INTO departments (code, name, block, manager_name, phone, description, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      [code, name, block, manager, phone, description, now, now]
     )
   }
   return result
@@ -125,11 +128,12 @@ function seedDepartments(): Record<string, number> {
 function seedLocations(): Record<string, number> {
   const now = nowISO()
   const rows: Array<[string, string, string, string, string, string, string]> = [
-    ['VP-HN', 'Văn phòng Hà Nội', 'Số 18 Nguyễn Chí Thanh, Đống Đa, Hà Nội', 'Tòa nhà ABC', 'Tầng 1-5', 'Toàn bộ', 'Trụ sở chính'],
-    ['P-HOP', 'Phòng họp tầng 2', 'Số 18 Nguyễn Chí Thanh, Đống Đa, Hà Nội', 'Tòa nhà ABC', 'Tầng 2', 'Phòng 201', 'Phòng họp nội bộ'],
-    ['KHO-IT', 'Kho thiết bị IT', 'Số 18 Nguyễn Chí Thanh, Đống Đa, Hà Nội', 'Tòa nhà ABC', 'Tầng hầm', 'Kho B1', 'Lưu trữ thiết bị chờ cấp phát'],
-    ['CN-DN', 'Chi nhánh Đà Nẵng', '125 Bạch Đằng, Hải Châu, Đà Nẵng', 'Tòa nhà Central', 'Tầng 3', 'Phòng 301', ''],
-    ['CN-HCM', 'Chi nhánh TP. Hồ Chí Minh', '88 Lê Lợi, Quận 1, TP. Hồ Chí Minh', 'Tòa nhà Pearl', 'Tầng 8', 'Phòng 801', '']
+    ['TRU-SO', 'Trụ sở UBND xã', 'Số 01, đường Trần Phú, xã An Bình', 'Nhà làm việc chính', 'Tầng 1', 'Toàn bộ', 'Khu hành chính trung tâm'],
+    ['P-HOP', 'Phòng họp HĐND - UBND', 'Số 01, đường Trần Phú, xã An Bình', 'Nhà làm việc chính', 'Tầng 2', 'Phòng 201', 'Phòng họp, hội nghị'],
+    ['P-TN', 'Bộ phận Tiếp nhận và Trả kết quả', 'Số 01, đường Trần Phú, xã An Bình', 'Nhà làm việc chính', 'Tầng 1', 'Phòng 101', 'Khu một cửa phục vụ nhân dân'],
+    ['P-DU', 'Khu làm việc Khối Đảng', 'Số 01, đường Trần Phú, xã An Bình', 'Nhà làm việc chính', 'Tầng 2', 'Phòng 202', 'Văn phòng Đảng ủy và các ban Đảng'],
+    ['HOI-TRUONG', 'Hội trường UBND xã', 'Số 01, đường Trần Phú, xã An Bình', 'Nhà văn hóa', 'Tầng 1', 'Hội trường', 'Tổ chức hội nghị, tập huấn'],
+    ['KHO', 'Kho thiết bị', 'Số 01, đường Trần Phú, xã An Bình', 'Nhà làm việc chính', 'Tầng 1', 'Kho K01', 'Lưu trữ thiết bị chờ cấp phát, sửa chữa']
   ]
   const result: Record<string, number> = {}
   for (const [code, name, address, building, floor, room, note] of rows) {
@@ -349,10 +353,10 @@ function seedCategories(): Record<string, number> {
 function seedSuppliers(): Record<string, number> {
   const now = nowISO()
   const rows: Array<[string, string, string, string, string, string, string, string]> = [
-    ['NCC-FPT', 'Công ty CP Bán lẻ Kỹ thuật số FPT', 'Trần Quốc Bảo', '1900 6600', 'cskh@fptshop.com.vn', '261 Khánh Hội, Quận 4, TP.HCM', '0304991791', 'fptshop.com.vn'],
-    ['NCC-PV', 'Công ty TNHH Thiết bị số Minh Phát', 'Nguyễn Thị Hồng', '024 3555 6677', 'kinhdoanh@minhphat.vn', '45 Thái Hà, Đống Đa, Hà Nội', '0106789123', 'minhphat.vn'],
-    ['NCC-DELL', 'Dell Technologies Việt Nam', 'Lê Anh Tuấn', '1800 1069', 'support@dell.com', 'Tòa nhà Vietcombank, Quận 1, TP.HCM', '0312345678', 'dell.com/vn'],
-    ['NCC-CANON', 'Canon Việt Nam', 'Phạm Văn Dũng', '1900 5555 88', 'canon@canon.com.vn', 'Tòa nhà Lotte, Ba Đình, Hà Nội', '0101239876', 'canon.com.vn']
+    ['NCC-PA', 'Công ty CP Thiết bị Văn phòng Phúc An', 'Trần Quốc Bảo', '0229 3888 666', 'kinhdoanh@phucan.vn', 'Số 12, đường Lê Lợi, xã An Bình', '5700123456', 'phucan.vn'],
+    ['NCC-MT', 'Công ty TNHH Máy tính Minh Thành', 'Nguyễn Thị Hồng', '0229 3777 555', 'kinhdoanh@minhthanh.vn', 'Số 45, đường Trần Phú, xã An Bình', '5700234567', 'minhthanh.vn'],
+    ['NCC-VT', 'Công ty CP Công nghệ Việt Tín', 'Lê Anh Tuấn', '1800 1069', 'hotro@viettin.vn', 'Số 88, đường Nguyễn Huệ, thành phố Ninh Bình', '5700345678', 'viettin.vn'],
+    ['NCC-BH', 'Trung tâm Bảo hành HP - Ninh Bình', 'Phạm Văn Dũng', '0229 3666 444', 'baohanh@hpninhbinh.vn', 'Số 26, đường Đinh Tiên Hoàng, thành phố Ninh Bình', '5700456789', 'hpninhbinh.vn']
   ]
   const result: Record<string, number> = {}
   for (const [code, name, contact, phone, email, address, tax, website] of rows) {
@@ -368,16 +372,24 @@ function seedSuppliers(): Record<string, number> {
 function seedEmployees(departments: Record<string, number>): Record<string, number> {
   const now = nowISO()
   const rows: Array<[string, string, string, string, string, string, string]> = [
-    ['NV001', 'Nguyễn Văn An', 'an.nguyen@abc.vn', '0912 345 001', 'Trưởng phòng IT', 'IT', ''],
-    ['NV002', 'Trần Thị Bích', 'bich.tran@abc.vn', '0912 345 002', 'Kế toán trưởng', 'KT', ''],
-    ['NV003', 'Lê Hoàng Minh', 'minh.le@abc.vn', '0912 345 003', 'Nhân viên kinh doanh', 'KD', ''],
-    ['NV004', 'Phạm Thu Hà', 'ha.pham@abc.vn', '0912 345 004', 'Chuyên viên hành chính', 'HCNS', ''],
-    ['NV005', 'Vũ Đức Long', 'long.vu@abc.vn', '0912 345 005', 'Trưởng phòng Kỹ thuật', 'KT-QL', ''],
-    ['NV006', 'Đặng Thị Mai', 'mai.dang@abc.vn', '0912 345 006', 'Thư ký Ban Giám đốc', 'BGD', ''],
-    ['NV007', 'Bùi Quang Huy', 'huy.bui@abc.vn', '0912 345 007', 'Quản trị hệ thống', 'IT', ''],
-    ['NV008', 'Ngô Thị Lan', 'lan.ngo@abc.vn', '0912 345 008', 'Kế toán viên', 'KT', ''],
-    ['NV009', 'Hoàng Văn Nam', 'nam.hoang@abc.vn', '0912 345 009', 'Trưởng nhóm kinh doanh', 'KD', ''],
-    ['NV010', 'Đỗ Thị Hương', 'huong.do@abc.vn', '0912 345 010', 'Kỹ sư kỹ thuật', 'KT-QL', '']
+    ['CB001', 'Nguyễn Văn Hùng', 'hung.nguyen@anbinh.gov.vn', '0912 345 001', 'Bí thư Đảng ủy', 'VP-DU', ''],
+    ['CB002', 'Lê Hoàng Minh', 'minh.le@anbinh.gov.vn', '0912 345 002', 'Phó Bí thư Thường trực Đảng ủy', 'VP-DU', ''],
+    ['CB003', 'Trần Thị Bích', 'bich.tran@anbinh.gov.vn', '0912 345 003', 'Trưởng ban Xây dựng Đảng', 'BXD-D', ''],
+    ['CB004', 'Phạm Thu Hà', 'ha.pham@anbinh.gov.vn', '0912 345 004', 'Chủ nhiệm Ủy ban Kiểm tra', 'UBKT', ''],
+    ['CB005', 'Đặng Thị Mai', 'mai.dang@anbinh.gov.vn', '0912 345 005', 'Chủ tịch Ủy ban MTTQ', 'MTTQ', ''],
+    ['CB006', 'Nguyễn Thị Hồng', 'hong.nguyen@anbinh.gov.vn', '0912 345 006', 'Chuyên viên Văn phòng Đảng ủy', 'VP-DU', ''],
+    ['CB007', 'Đỗ Văn Thành', 'thanh.do@anbinh.gov.vn', '0912 345 007', 'Phó Chủ nhiệm Ủy ban Kiểm tra', 'UBKT', ''],
+    ['CB008', 'Nguyễn Minh Quân', 'quan.nguyen@anbinh.gov.vn', '0912 345 008', 'Chánh Văn phòng HĐND và UBND', 'VP', ''],
+    ['CB009', 'Hoàng Văn Nam', 'nam.hoang@anbinh.gov.vn', '0912 345 009', 'Trưởng phòng Kinh tế', 'KT', ''],
+    ['CB010', 'Ngô Thị Lan', 'lan.ngo@anbinh.gov.vn', '0912 345 010', 'Trưởng phòng Văn hóa - Xã hội', 'VHXH', ''],
+    ['CB011', 'Vũ Đức Long', 'long.vu@anbinh.gov.vn', '0912 345 011', 'Giám đốc Trung tâm Phục vụ Hành chính Công', 'PVHCC', ''],
+    ['CB012', 'Bùi Quang Huy', 'huy.bui@anbinh.gov.vn', '0912 345 012', 'Giám đốc Trung tâm Dịch vụ Tổng hợp', 'DVTH', ''],
+    ['CB013', 'Nguyễn Văn An', 'an.nguyen@anbinh.gov.vn', '0912 345 013', 'Công chức Văn phòng - Thống kê', 'VP', ''],
+    ['CB014', 'Trần Quốc Bảo', 'bao.tran@anbinh.gov.vn', '0912 345 014', 'Công chức Kế toán', 'VP', ''],
+    ['CB015', 'Lê Thị Thu', 'thu.le@anbinh.gov.vn', '0912 345 015', 'Công chức Tư pháp - Hộ tịch', 'VP', ''],
+    ['CB016', 'Phạm Văn Dũng', 'dung.pham@anbinh.gov.vn', '0912 345 016', 'Công chức Địa chính - Xây dựng', 'KT', ''],
+    ['CB017', 'Nguyễn Thị Hương', 'huong.nguyen@anbinh.gov.vn', '0912 345 017', 'Chuyên viên Phòng Văn hóa - Xã hội', 'VHXH', ''],
+    ['CB018', 'Trần Văn Sơn', 'son.tran@anbinh.gov.vn', '0912 345 018', 'Nhân viên Trung tâm Dịch vụ Tổng hợp', 'DVTH', '']
   ]
   const result: Record<string, number> = {}
   for (const [code, fullName, email, phone, position, dept, note] of rows) {
@@ -438,10 +450,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Dell',
       status: 'in_use',
       condition: 'good',
-      department: 'IT',
-      location: 'VP-HN',
-      employee: 'NV007',
-      supplier: 'NCC-DELL',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB013',
+      supplier: 'NCC-MT',
       purchaseDate: monthsAgo(30),
       purchasePrice: 18500000,
       invoice: 'HD-2024-0158',
@@ -459,9 +471,9 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       status: 'in_use',
       condition: 'good',
       department: 'KT',
-      location: 'VP-HN',
-      employee: 'NV008',
-      supplier: 'NCC-FPT',
+      location: 'TRU-SO',
+      employee: 'CB016',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(38),
       purchasePrice: 14200000,
       warrantyMonths: 36,
@@ -477,9 +489,9 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Dell',
       status: 'available',
       condition: 'fair',
-      department: 'HCNS',
-      location: 'KHO-IT',
-      supplier: 'NCC-DELL',
+      department: 'VHXH',
+      location: 'KHO',
+      supplier: 'NCC-MT',
       purchaseDate: dateOffset(-350),
       purchasePrice: 12500000,
       warrantyMonths: 12,
@@ -496,15 +508,53 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Dell',
       status: 'in_use',
       condition: 'new',
-      department: 'KD',
-      location: 'VP-HN',
-      employee: 'NV009',
-      supplier: 'NCC-DELL',
+      department: 'VP-DU',
+      location: 'P-DU',
+      employee: 'CB006',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(8),
       purchasePrice: 16900000,
       warrantyMonths: 36,
       depreciationMonths: 60,
       specs: { cpu: 'Intel Core i5-13400', ram: 16, storage: 'SSD NVMe 512GB', gpu: 'Intel UHD 730', monitor: 'Dell S2421HN', os: 'Windows 11 Pro' }
+    },
+    {
+      code: 'PC-0005',
+      name: 'Máy tính để bàn HP ProDesk 600 G6',
+      category: 'PC',
+      serial: 'HPP600-2024-006',
+      model: 'ProDesk 600 G6 SFF',
+      manufacturer: 'HP',
+      status: 'in_use',
+      condition: 'good',
+      department: 'UBKT',
+      location: 'P-DU',
+      employee: 'CB007',
+      supplier: 'NCC-MT',
+      purchaseDate: monthsAgo(26),
+      purchasePrice: 15800000,
+      warrantyMonths: 36,
+      depreciationMonths: 60,
+      specs: { cpu: 'Intel Core i5-10500', ram: 8, storage: 'SSD NVMe 256GB', gpu: 'Intel UHD 630', monitor: 'HP P22h G5', os: 'Windows 11 Pro' }
+    },
+    {
+      code: 'PC-0006',
+      name: 'Máy tính để bàn Dell OptiPlex 3000',
+      category: 'PC',
+      serial: 'DLL3000-2023-022',
+      model: 'OptiPlex 3000 SFF',
+      manufacturer: 'Dell',
+      status: 'in_use',
+      condition: 'good',
+      department: 'MTTQ',
+      location: 'P-DU',
+      employee: 'CB005',
+      supplier: 'NCC-MT',
+      purchaseDate: monthsAgo(24),
+      purchasePrice: 13900000,
+      warrantyMonths: 36,
+      depreciationMonths: 60,
+      specs: { cpu: 'Intel Core i5-12400', ram: 8, storage: 'SSD NVMe 256GB', gpu: 'Intel UHD 730', monitor: 'Dell E2222H', os: 'Windows 11 Pro' }
     },
     {
       code: 'LAP-0001',
@@ -515,10 +565,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Dell',
       status: 'in_use',
       condition: 'good',
-      department: 'KD',
-      location: 'VP-HN',
-      employee: 'NV003',
-      supplier: 'NCC-DELL',
+      department: 'KT',
+      location: 'TRU-SO',
+      employee: 'CB009',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(20),
       purchasePrice: 26400000,
       warrantyMonths: 36,
@@ -527,22 +577,22 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
     },
     {
       code: 'LAP-0002',
-      name: 'MacBook Air M2 13 inch',
+      name: 'Laptop Dell Latitude 7440',
       category: 'LAPTOP',
-      serial: 'MBA-M2-2023-009',
-      model: 'MacBook Air M2',
-      manufacturer: 'Apple',
+      serial: 'LAT7440-2024-009',
+      model: 'Latitude 7440',
+      manufacturer: 'Dell',
       status: 'in_use',
       condition: 'good',
-      department: 'BGD',
-      location: 'VP-HN',
-      employee: 'NV006',
-      supplier: 'NCC-FPT',
+      department: 'VP-DU',
+      location: 'P-DU',
+      employee: 'CB001',
+      supplier: 'NCC-MT',
       purchaseDate: monthsAgo(26),
       purchasePrice: 31900000,
-      warrantyMonths: 12,
+      warrantyMonths: 36,
       depreciationMonths: 48,
-      specs: { cpu: 'Apple M2 8-core', ram: 16, storage: 'SSD 512GB', screen: '13.6', os: 'macOS', weight: 1.24 }
+      specs: { cpu: 'Intel Core i7-1355U', ram: 16, storage: 'SSD NVMe 512GB', screen: '14', os: 'Windows 11 Pro', weight: 1.33 }
     },
     {
       code: 'LAP-0003',
@@ -553,10 +603,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Lenovo',
       status: 'in_use',
       condition: 'good',
-      department: 'IT',
-      location: 'VP-HN',
-      employee: 'NV001',
-      supplier: 'NCC-PV',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB008',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(16),
       purchasePrice: 28900000,
       warrantyMonths: 36,
@@ -572,9 +622,9 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'HP',
       status: 'maintenance',
       condition: 'poor',
-      department: 'KT-QL',
-      location: 'KHO-IT',
-      supplier: 'NCC-FPT',
+      department: 'BXD-D',
+      location: 'KHO',
+      supplier: 'NCC-BH',
       purchaseDate: monthsAgo(28),
       purchasePrice: 23500000,
       warrantyMonths: 24,
@@ -591,16 +641,16 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Asus',
       status: 'disposed',
       condition: 'broken',
-      department: 'KT-QL',
-      location: 'KHO-IT',
-      supplier: 'NCC-PV',
+      department: 'DVTH',
+      location: 'KHO',
+      supplier: 'NCC-MT',
       purchaseDate: monthsAgo(72),
       purchasePrice: 14900000,
       warrantyMonths: 24,
       depreciationMonths: 36,
       salvageValue: 500000,
       specs: { cpu: 'Intel Core i5-8265U', ram: 8, storage: 'SSD 256GB', screen: '14', os: 'Windows 10 Pro', weight: 1.5 },
-      note: 'Đã thanh lý tháng trước'
+      note: 'Đã thanh lý theo quyết định của UBND xã'
     },
     {
       code: 'PRN-0001',
@@ -611,10 +661,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'HP',
       status: 'in_use',
       condition: 'good',
-      department: 'HCNS',
-      location: 'VP-HN',
-      employee: 'NV004',
-      supplier: 'NCC-FPT',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB014',
+      supplier: 'NCC-PA',
       purchaseDate: monthsAgo(34),
       purchasePrice: 8900000,
       warrantyMonths: 24,
@@ -630,10 +680,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Canon',
       status: 'in_use',
       condition: 'good',
-      department: 'KT',
-      location: 'VP-HN',
-      employee: 'NV002',
-      supplier: 'NCC-CANON',
+      department: 'PVHCC',
+      location: 'P-TN',
+      employee: 'CB011',
+      supplier: 'NCC-PA',
       purchaseDate: monthsAgo(22),
       purchasePrice: 46500000,
       warrantyMonths: 24,
@@ -649,9 +699,9 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Brother',
       status: 'available',
       condition: 'good',
-      department: 'HCNS',
-      location: 'KHO-IT',
-      supplier: 'NCC-PV',
+      department: 'VHXH',
+      location: 'KHO',
+      supplier: 'NCC-PA',
       purchaseDate: monthsAgo(14),
       purchasePrice: 3200000,
       warrantyMonths: 12,
@@ -667,15 +717,15 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'HP',
       status: 'lost',
       condition: 'broken',
-      department: 'KT-QL',
-      location: 'KHO-IT',
-      supplier: 'NCC-FPT',
+      department: 'DVTH',
+      location: 'KHO',
+      supplier: 'NCC-MT',
       purchaseDate: monthsAgo(120),
       purchasePrice: 2800000,
       warrantyMonths: 12,
       depreciationMonths: 36,
       specs: { technology: 'Laser đen trắng', speed: 14, resolution: '600 x 600 dpi', paper: 'A4', connection: 'USB', color: 'Không' },
-      note: 'Thất lạc sau đợt chuyển văn phòng'
+      note: 'Thất lạc sau đợt sắp xếp lại kho thiết bị'
     },
     {
       code: 'SCN-0001',
@@ -686,10 +736,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Fujitsu',
       status: 'in_use',
       condition: 'good',
-      department: 'KT',
-      location: 'VP-HN',
-      employee: 'NV008',
-      supplier: 'NCC-PV',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB015',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(30),
       purchasePrice: 21500000,
       warrantyMonths: 24,
@@ -705,9 +755,9 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Canon',
       status: 'available',
       condition: 'good',
-      department: 'HCNS',
-      location: 'KHO-IT',
-      supplier: 'NCC-CANON',
+      department: 'PVHCC',
+      location: 'KHO',
+      supplier: 'NCC-PA',
       purchaseDate: monthsAgo(18),
       purchasePrice: 9800000,
       warrantyMonths: 12,
@@ -723,10 +773,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Epson',
       status: 'in_use',
       condition: 'new',
-      department: 'HCNS',
-      location: 'VP-HN',
-      employee: 'NV004',
-      supplier: 'NCC-PV',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB013',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(5),
       purchasePrice: 13200000,
       warrantyMonths: 24,
@@ -742,9 +792,9 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Epson',
       status: 'available',
       condition: 'good',
-      department: 'HCNS',
+      department: 'VHXH',
       location: 'P-HOP',
-      supplier: 'NCC-PV',
+      supplier: 'NCC-PA',
       purchaseDate: monthsAgo(24),
       purchasePrice: 16800000,
       warrantyMonths: 24,
@@ -760,10 +810,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Cisco',
       status: 'in_use',
       condition: 'good',
-      department: 'IT',
-      location: 'KHO-IT',
-      employee: 'NV007',
-      supplier: 'NCC-FPT',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB013',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(48),
       purchasePrice: 38500000,
       warrantyMonths: 60,
@@ -779,9 +829,9 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'TP-Link',
       status: 'available',
       condition: 'good',
-      department: 'IT',
-      location: 'KHO-IT',
-      supplier: 'NCC-FPT',
+      department: 'DVTH',
+      location: 'KHO',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(12),
       purchasePrice: 2450000,
       warrantyMonths: 24,
@@ -797,10 +847,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Ubiquiti',
       status: 'in_use',
       condition: 'good',
-      department: 'IT',
-      location: 'VP-HN',
-      employee: 'NV001',
-      supplier: 'NCC-PV',
+      department: 'VP-DU',
+      location: 'P-DU',
+      employee: 'CB006',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(30),
       purchasePrice: 3900000,
       warrantyMonths: 24,
@@ -816,10 +866,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'APC',
       status: 'in_use',
       condition: 'fair',
-      department: 'IT',
-      location: 'KHO-IT',
-      employee: 'NV007',
-      supplier: 'NCC-PV',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB013',
+      supplier: 'NCC-VT',
       purchaseDate: monthsAgo(42),
       purchasePrice: 12800000,
       warrantyMonths: 36,
@@ -836,10 +886,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'Dell',
       status: 'in_use',
       condition: 'new',
-      department: 'IT',
-      location: 'VP-HN',
-      employee: 'NV007',
-      supplier: 'NCC-DELL',
+      department: 'VP',
+      location: 'TRU-SO',
+      employee: 'CB013',
+      supplier: 'NCC-MT',
       purchaseDate: monthsAgo(10),
       purchasePrice: 6200000,
       warrantyMonths: 36,
@@ -855,10 +905,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       manufacturer: 'LG',
       status: 'in_use',
       condition: 'new',
-      department: 'KD',
-      location: 'VP-HN',
-      employee: 'NV009',
-      supplier: 'NCC-FPT',
+      department: 'KT',
+      location: 'TRU-SO',
+      employee: 'CB009',
+      supplier: 'NCC-PA',
       purchaseDate: monthsAgo(4),
       purchasePrice: 11900000,
       warrantyMonths: 24,
@@ -866,7 +916,6 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       specs: { size: 27, resolution: '3840 x 2160', panel: 'IPS', ports: 'HDMI, DP, USB-C' }
     }
   ]
-
   const assetIds: Record<string, number> = {}
   const employeeByCode = ctx.employees
   const employeeNames: Record<number, string> = {}
@@ -962,10 +1011,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
 
   // Lịch sử cấp phát đã thu hồi
   const historyRows: Array<[string, string, string, string, string | null]> = [
-    ['PC-0003', 'NV004', monthsAgo(18), monthsAgo(4), 'Thu hồi do nâng cấp thiết bị'],
-    ['LAP-0004', 'NV005', monthsAgo(20), monthsAgo(1), 'Thu hồi để sửa chữa'],
-    ['LAP-0005', 'NV010', monthsAgo(48), monthsAgo(20), 'Thu hồi do hỏng, chờ thanh lý'],
-    ['SCN-0002', 'NV004', monthsAgo(12), monthsAgo(3), 'Chuyển sang kho dự phòng']
+    ['PC-0003', 'CB017', monthsAgo(18), monthsAgo(4), 'Thu hồi do nâng cấp thiết bị'],
+    ['LAP-0004', 'CB003', monthsAgo(20), monthsAgo(1), 'Thu hồi để sửa chữa'],
+    ['LAP-0005', 'CB012', monthsAgo(48), monthsAgo(20), 'Thu hồi do hỏng, chờ thanh lý'],
+    ['SCN-0002', 'CB011', monthsAgo(12), monthsAgo(3), 'Chuyển sang kho dự phòng']
   ]
   for (const [assetCode, empCode, assigned, returned, note] of historyRows) {
     const asset = assets.find((a) => a.code === assetCode)
@@ -1013,8 +1062,8 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       type: 'corrective',
       title: 'Thay bàn phím và vệ sinh tản nhiệt',
       description: 'Một số phím không nhận, máy nóng và quạt kêu to khi làm việc.',
-      provider: 'Trung tâm bảo hành HP - FPT',
-      assignee: 'Nguyễn Đức Kỹ Thuật',
+      provider: 'Trung tâm Bảo hành HP - Ninh Bình',
+      assignee: 'Phạm Văn Dũng',
       scheduled: dateOffset(-2),
       completed: null,
       cost: 0,
@@ -1028,8 +1077,8 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       type: 'preventive',
       title: 'Bảo dưỡng định kỳ máy in Canon',
       description: 'Vệ sinh trống mực, kiểm tra bộ nạp giấy và thay hộp mực dự phòng.',
-      provider: 'Canon Việt Nam',
-      assignee: 'Phạm Văn Dũng',
+      provider: 'Công ty CP Thiết bị Văn phòng Phúc An',
+      assignee: 'Trần Quốc Bảo',
       scheduled: dateOffset(10),
       completed: null,
       cost: 850000,
@@ -1043,7 +1092,7 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       type: 'preventive',
       title: 'Vệ sinh máy chiếu và kiểm tra bóng đèn',
       description: 'Bảo dưỡng trước đợt họp tổng kết quý.',
-      provider: 'Công ty TNHH Thiết bị số Minh Phát',
+      provider: 'Công ty TNHH Máy tính Minh Thành',
       assignee: 'Nguyễn Thị Hồng',
       scheduled: dateOffset(25),
       completed: null,
@@ -1058,8 +1107,8 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       type: 'inspection',
       title: 'Kiểm tra tổng thể máy tính và cập nhật Windows',
       description: 'Rà soát phần cứng, vệ sinh bụi bên trong và cập nhật bản vá bảo mật.',
-      provider: 'Phòng IT',
-      assignee: 'Bùi Quang Huy',
+      provider: 'Văn phòng HĐND và UBND',
+      assignee: 'Nguyễn Văn An',
       scheduled: dateOffset(-32),
       completed: dateOffset(-30),
       cost: 350000,
@@ -1073,7 +1122,7 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       type: 'preventive',
       title: 'Kiểm tra ắc quy và thời gian lưu điện',
       description: 'Thời gian lưu điện có dấu hiệu giảm, cần kiểm tra dung lượng ắc quy.',
-      provider: 'Công ty TNHH Thiết bị số Minh Phát',
+      provider: 'Công ty CP Công nghệ Việt Tín',
       assignee: 'Lê Anh Tuấn',
       scheduled: dateOffset(-5),
       completed: null,
@@ -1088,8 +1137,8 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       type: 'corrective',
       title: 'Sửa cổng uplink bị lỗi',
       description: 'Cổng uplink số 24 chập chờn, ảnh hưởng kết nối tầng 2.',
-      provider: 'Phòng IT',
-      assignee: 'Bùi Quang Huy',
+      provider: 'Văn phòng HĐND và UBND',
+      assignee: 'Nguyễn Văn An',
       scheduled: dateOffset(-65),
       completed: dateOffset(-63),
       cost: 1250000,
@@ -1103,7 +1152,7 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       type: 'upgrade',
       title: 'Nâng cấp RAM từ 8GB lên 16GB',
       description: 'Đáp ứng nhu cầu làm việc với bảng tính lớn.',
-      provider: 'Phòng IT',
+      provider: 'Văn phòng HĐND và UBND',
       assignee: 'Nguyễn Văn An',
       scheduled: dateOffset(40),
       completed: null,
@@ -1147,18 +1196,18 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
      VALUES (?, ?, ?, NULL, ?, ?, 'completed', ?, ?, ?, ?)`,
     [
       `KK-${todayISO().slice(0, 7).replace('-', '')}-001`,
-      'Kiểm kê thiết bị Phòng IT - Quý III',
-      ctx.departments.IT,
+      'Kiểm kê thiết bị Văn phòng HĐND và UBND - Quý III',
+      ctx.departments.VP,
       monthsAgo(1),
       dateOffset(-25),
-      'Kiểm kê định kỳ theo quy trình nội bộ',
+      'Kiểm kê định kỳ theo quy định quản lý tài sản công',
       admin,
       stampOffset(-30, 8),
       stampOffset(-24, 17)
     ]
   )
-  const itAssets = assets.filter((a) => a.department === 'IT')
-  for (const [index, asset] of itAssets.entries()) {
+  const auditAssets = assets.filter((a) => a.department === 'VP')
+  for (const [index, asset] of auditAssets.entries()) {
     const assetId = assetIds[asset.code]
     let result = 'matched'
     let actualLocation: number | null = ctx.locations[asset.location]
@@ -1201,7 +1250,7 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       `KK-${todayISO().slice(0, 7).replace('-', '')}-002`,
       'Kiểm kê toàn bộ thiết bị tháng này',
       dateOffset(-3),
-      'Kiểm kê toàn công ty, ưu tiên thiết bị đang sử dụng',
+      'Kiểm kê toàn bộ thiết bị của xã, ưu tiên thiết bị đang sử dụng',
       manager,
       stampOffset(-3, 8)
     ]
@@ -1233,10 +1282,10 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
   const logs: Array<[number, string, string, string, number | null, string, string]> = [
     [admin, 'Đăng nhập hệ thống', 'system', 'system', null, 'Phiên đăng nhập quản trị', stampOffset(0, 8)],
     [manager, 'Tạo phiếu bảo trì MT-0002', 'maintenance', 'maintenance', null, 'Bảo dưỡng định kỳ máy in Canon', stampOffset(-1, 14)],
-    [manager, 'Cấp phát thiết bị', 'assignment', 'asset', assetIds['MON-0002'], 'Laptop/Màn hình cho Hoàng Văn Nam', stampOffset(-2, 10)],
+    [manager, 'Cấp phát thiết bị', 'assignment', 'asset', assetIds['MON-0002'], 'Cấp phát màn hình cho Hoàng Văn Nam', stampOffset(-2, 10)],
     [admin, 'Cập nhật thông tin thiết bị', 'asset', 'asset', assetIds['UPS-0001'], 'Bổ sung ghi chú kiểm tra ắc quy', stampOffset(-3, 16)],
     [manager, 'Tạo phiên kiểm kê', 'audit', 'audit', audit2, 'Kiểm kê toàn bộ thiết bị tháng này', stampOffset(-3, 8)],
-    [admin, 'Hoàn thành kiểm kê', 'audit', 'audit', audit1, 'Kiểm kê thiết bị Phòng IT - Quý III', stampOffset(-24, 17)],
+    [admin, 'Hoàn thành kiểm kê', 'audit', 'audit', audit1, 'Kiểm kê thiết bị Văn phòng HĐND và UBND - Quý III', stampOffset(-24, 17)],
     [ctx.users.staff, 'Cập nhật trạng thái bảo trì', 'maintenance', 'asset', assetIds['LAP-0004'], 'Chuyển thiết bị sang trạng thái đang bảo trì', stampOffset(-28, 11)],
     [admin, 'Thanh lý thiết bị', 'asset', 'asset', assetIds['LAP-0005'], 'Thanh lý laptop Asus ExpertBook', stampOffset(-35, 15)]
   ]

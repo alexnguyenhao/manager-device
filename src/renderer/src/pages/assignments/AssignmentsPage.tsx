@@ -246,9 +246,9 @@ export function AssignmentsPage() {
                 setDepartmentId(event.target.value)
                 setPage(1)
               }}
-              aria-label="Lọc bộ phận"
+              aria-label="Lọc phòng ban"
             >
-              <option value="">Tất cả bộ phận</option>
+              <option value="">Tất cả phòng ban</option>
               {departments.map((department) => (
                 <option key={department.id} value={department.id}>
                   {department.name}

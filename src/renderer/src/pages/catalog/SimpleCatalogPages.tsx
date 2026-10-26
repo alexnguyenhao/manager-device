@@ -11,7 +11,7 @@ import {
   Truck
 } from 'lucide-react'
 import type { Department, Location, Supplier } from '@shared/types'
-import { hasPermission } from '@shared/constants'
+import { ORG_BLOCK_META, ORG_BLOCK_OPTIONS, hasPermission } from '@shared/constants'
 import { formatNumber } from '@shared/utils'
 import { api, errorMessage } from '../../lib/api'
 import { useCurrentUser } from '../../store/auth'
@@ -20,7 +20,7 @@ import { PageHeader } from '../../components/layout/PageHeader'
 import { SearchInput } from '../../components/common/SearchInput'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { Field, Input, Switch, Textarea } from '../../components/ui/Input'
+import { Field, Input, Select, Switch, Textarea } from '../../components/ui/Input'
 import { EmptyState, Spinner } from '../../components/ui/Feedback'
 import { Dropdown, DropdownMenu } from '../../components/ui/Dropdown'
 import { Modal } from '../../components/ui/Modal'
@@ -36,7 +36,8 @@ interface CatalogField {
   hint?: string
   required?: boolean
   uppercase?: boolean
-  type?: 'text' | 'email' | 'textarea' | 'switch'
+  type?: 'text' | 'email' | 'textarea' | 'switch' | 'select'
+  options?: Array<{ value: string; label: string }>
   full?: boolean
 }
 
@@ -58,6 +59,11 @@ interface SimpleCatalogConfig {
   fields: CatalogField[]
   deleteDescription: (item: CatalogItem) => string
   emptyDescription: string
+  filter?: {
+    key: string
+    label: string
+    options: Array<{ value: string; label: string }>
+  }
 }
 
 type FormValues = Record<string, string | boolean>
@@ -96,6 +102,7 @@ function SimpleCatalogPage({ config }: { config: SimpleCatalogConfig }) {
   const [items, setItems] = useState<CatalogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterValue, setFilterValue] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CatalogItem | null>(null)
   const [values, setValues] = useState<FormValues>(() => buildDefaults(config.fields))
@@ -120,9 +127,15 @@ function SimpleCatalogPage({ config }: { config: SimpleCatalogConfig }) {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return items
-    return items.filter((item) => config.searchText(item).toLowerCase().includes(term))
-  }, [items, search, config])
+    return items.filter((item) => {
+      if (config.filter && filterValue) {
+        const value = (item as unknown as Record<string, unknown>)[config.filter.key]
+        if (String(value) !== filterValue) return false
+      }
+      if (!term) return true
+      return config.searchText(item).toLowerCase().includes(term)
+    })
+  }, [items, search, filterValue, config])
 
   const openCreate = (): void => {
     setEditing(null)
@@ -212,12 +225,29 @@ function SimpleCatalogPage({ config }: { config: SimpleCatalogConfig }) {
       />
 
       <div className="card mb-3 p-3">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder={config.searchPlaceholder}
-          className="sm:w-[360px]"
-        />
+        <div className="flex flex-col gap-2.5 sm:flex-row">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={config.searchPlaceholder}
+            className="sm:w-[360px]"
+          />
+          {config.filter && (
+            <Select
+              value={filterValue}
+              onChange={(event) => setFilterValue(event.target.value)}
+              className="sm:w-[220px]"
+              aria-label={config.filter.label}
+            >
+              <option value="">{config.filter.label}</option>
+              {config.filter.options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -337,6 +367,32 @@ function SimpleCatalogPage({ config }: { config: SimpleCatalogConfig }) {
                   </div>
                 )
               }
+              if (field.type === 'select') {
+                return (
+                  <Field
+                    key={field.key}
+                    label={field.label}
+                    required={field.required}
+                    hint={field.hint}
+                    htmlFor={`catalog-${field.key}`}
+                  >
+                    <Select
+                      id={`catalog-${field.key}`}
+                      value={String(values[field.key] ?? '')}
+                      onChange={(event) =>
+                        setValues((prev) => ({ ...prev, [field.key]: event.target.value }))
+                      }
+                    >
+                      <option value="">Chọn {field.label.toLowerCase()}</option>
+                      {(field.options ?? []).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )
+              }
               return (
                 <Field
                   key={field.key}
@@ -383,34 +439,59 @@ function SimpleCatalogPage({ config }: { config: SimpleCatalogConfig }) {
 }
 
 const DEPARTMENT_CONFIG: SimpleCatalogConfig = {
-  title: 'Bộ phận',
-  description: 'Quản lý các phòng ban, đơn vị sử dụng và quản lý tài sản.',
+  title: 'Cơ cấu tổ chức',
+  description: 'Quản lý phòng ban, đơn vị thuộc Khối Đảng và Khối Nhà nước của xã.',
   icon: Building2,
-  singular: 'Bộ phận',
+  singular: 'Đơn vị',
   kind: 'departments',
   searchPlaceholder: 'Tìm theo tên, mã, người quản lý…',
   searchText: (item) => {
     const department = item as Department
-    return [department.name, department.code, department.managerName, department.phone]
+    return [
+      department.name,
+      department.code,
+      department.managerName,
+      department.phone,
+      ORG_BLOCK_META[department.block]?.label
+    ]
       .filter(Boolean)
       .join(' ')
   },
+  filter: {
+    key: 'block',
+    label: 'Tất cả các khối',
+    options: ORG_BLOCK_OPTIONS.map((block) => ({
+      value: block,
+      label: ORG_BLOCK_META[block].label
+    }))
+  },
   fields: [
-    { key: 'code', label: 'Mã bộ phận', required: true, uppercase: true, placeholder: 'IT' },
-    { key: 'name', label: 'Tên bộ phận', required: true, placeholder: 'Phòng Công nghệ thông tin' },
-    { key: 'managerName', label: 'Người quản lý', placeholder: 'Trưởng phòng' },
-    { key: 'phone', label: 'Số điện thoại', placeholder: '024 xxxx xxxx' },
-    { key: 'description', label: 'Mô tả', type: 'textarea', placeholder: 'Chức năng, nhiệm vụ của bộ phận…' },
+    { key: 'code', label: 'Mã phòng ban', required: true, uppercase: true, placeholder: 'VP' },
+    { key: 'name', label: 'Tên phòng ban, đơn vị', required: true, placeholder: 'Văn phòng HĐND và UBND' },
+    {
+      key: 'block',
+      label: 'Khối cơ quan',
+      type: 'select',
+      required: true,
+      hint: 'Khối Đảng hoặc Khối Nhà nước',
+      options: ORG_BLOCK_OPTIONS.map((block) => ({
+        value: block,
+        label: ORG_BLOCK_META[block].label
+      }))
+    },
+    { key: 'managerName', label: 'Người phụ trách', placeholder: 'Trưởng phòng' },
+    { key: 'phone', label: 'Số điện thoại', placeholder: '0229 xxxx xxx' },
+    { key: 'description', label: 'Mô tả', type: 'textarea', placeholder: 'Chức năng, nhiệm vụ của phòng ban, đơn vị…' },
     {
       key: 'isActive',
       label: 'Đang hoạt động',
       type: 'switch',
-      hint: 'Bộ phận ngừng hoạt động sẽ không được chọn khi cấp phát thiết bị.'
+      hint: 'Đơn vị ngừng hoạt động sẽ không được chọn khi cấp phát thiết bị.'
     }
   ],
   columns: [
     {
-      header: 'Bộ phận',
+      header: 'Phòng ban, đơn vị',
       render: (item) => {
         const department = item as Department
         return (
@@ -422,7 +503,15 @@ const DEPARTMENT_CONFIG: SimpleCatalogConfig = {
       }
     },
     {
-      header: 'Người quản lý',
+      header: 'Khối',
+      render: (item) => {
+        const block = (item as Department).block
+        const meta = ORG_BLOCK_META[block] ?? ORG_BLOCK_META.state
+        return <Badge tone={meta.tone}>{meta.label}</Badge>
+      }
+    },
+    {
+      header: 'Người phụ trách',
       render: (item) => {
         const department = item as Department
         return (
@@ -459,8 +548,8 @@ const DEPARTMENT_CONFIG: SimpleCatalogConfig = {
     }
   ],
   deleteDescription: (item) =>
-    `Bộ phận "${(item as Department).name}" sẽ bị xóa. Chỉ có thể xóa khi chưa có nhân viên hoặc thiết bị trực thuộc.`,
-  emptyDescription: 'Thêm bộ phận để phân chia tài sản theo phòng ban.'
+    `Đơn vị "${(item as Department).name}" sẽ bị xóa. Chỉ có thể xóa khi chưa có nhân viên hoặc thiết bị trực thuộc.`,
+  emptyDescription: 'Thêm phòng ban, đơn vị để phân chia tài sản theo cơ cấu tổ chức.'
 }
 
 const LOCATION_CONFIG: SimpleCatalogConfig = {

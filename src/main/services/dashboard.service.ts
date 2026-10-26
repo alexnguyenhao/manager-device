@@ -1,4 +1,5 @@
-import type { AssetStatus, DashboardData } from '../../shared/types'
+import type { AssetStatus, DashboardData, OrgBlock } from '../../shared/types'
+import { ORG_BLOCK_OPTIONS } from '../../shared/constants'
 import { listAllAssets } from './asset.service'
 import { listAssignments } from './assignment.service'
 import { listMaintenance } from './maintenance.service'
@@ -24,6 +25,7 @@ export function getDashboard(): DashboardData {
   let totalCurrentValue = 0
   const categoryMap = new Map<string, { name: string; count: number; value: number }>()
   const departmentMap = new Map<string, { name: string; count: number; value: number }>()
+  const blockMap = new Map<OrgBlock, { block: OrgBlock; count: number; value: number }>()
 
   for (const asset of assets) {
     counts.set(asset.status, (counts.get(asset.status) ?? 0) + 1)
@@ -39,11 +41,22 @@ export function getDashboard(): DashboardData {
     category.value += asset.currentValue
     categoryMap.set(asset.categoryName, category)
 
-    const deptName = asset.departmentName ?? 'Chưa phân bộ phận'
+    const deptName = asset.departmentName ?? 'Chưa phân phòng ban'
     const department = departmentMap.get(deptName) ?? { name: deptName, count: 0, value: 0 }
     department.count += 1
     department.value += asset.currentValue
     departmentMap.set(deptName, department)
+
+    if (asset.departmentBlock) {
+      const block = blockMap.get(asset.departmentBlock) ?? {
+        block: asset.departmentBlock,
+        count: 0,
+        value: 0
+      }
+      block.count += 1
+      block.value += asset.currentValue
+      blockMap.set(asset.departmentBlock, block)
+    }
   }
 
   const warrantyLimit = addDays(today, settings.warrantyWarningDays)
@@ -112,6 +125,9 @@ export function getDashboard(): DashboardData {
     byStatus: statuses
       .map((status) => ({ status, count: counts.get(status) ?? 0 }))
       .filter((item) => item.count > 0),
+    byBlock: ORG_BLOCK_OPTIONS.map(
+      (block) => blockMap.get(block) ?? { block, count: 0, value: 0 }
+    ),
     byDepartment: [...departmentMap.values()].sort((a, b) => b.count - a.count),
     maintenanceCost,
     warrantyExpiring: warrantyExpiring.slice(0, 6),

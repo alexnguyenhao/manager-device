@@ -4,6 +4,9 @@
 
 export type Role = 'admin' | 'manager' | 'staff' | 'viewer'
 
+/** Khối cơ quan trong bộ máy chính quyền cấp xã */
+export type OrgBlock = 'party' | 'state'
+
 export type AssetStatus = 'available' | 'in_use' | 'maintenance' | 'reserved' | 'disposed' | 'lost'
 export type AssetCondition = 'new' | 'good' | 'fair' | 'poor' | 'broken'
 
@@ -97,6 +100,7 @@ export interface Department {
   id: number
   code: string
   name: string
+  block: OrgBlock
   managerName: string | null
   phone: string | null
   description: string | null
@@ -110,6 +114,7 @@ export interface Department {
 export interface DepartmentInput {
   code: string
   name: string
+  block: OrgBlock
   managerName?: string | null
   phone?: string | null
   description?: string | null
@@ -181,6 +186,7 @@ export interface Employee {
   position: string | null
   departmentId: number | null
   departmentName: string | null
+  departmentBlock: OrgBlock | null
   isActive: boolean
   note: string | null
   assetCount?: number
@@ -215,6 +221,7 @@ export interface Asset {
   condition: AssetCondition
   departmentId: number | null
   departmentName: string | null
+  departmentBlock: OrgBlock | null
   locationId: number | null
   locationName: string | null
   assignedEmployeeId: number | null
@@ -274,6 +281,7 @@ export interface AssetListParams {
   search?: string
   categoryId?: number | null
   departmentId?: number | null
+  block?: OrgBlock | null
   locationId?: number | null
   status?: AssetStatus | 'all'
   condition?: AssetCondition | 'all'
@@ -517,6 +525,7 @@ export interface AuditCompleteInput {
 export interface ReportParams {
   categoryId?: number | null
   departmentId?: number | null
+  block?: OrgBlock | null
   locationId?: number | null
   status?: AssetStatus | 'all'
   fromDate?: string | null
@@ -557,6 +566,7 @@ export interface ReportData {
     depreciationRate: number
   }
   byCategory: ReportGroup[]
+  byBlock: ReportGroup[]
   byDepartment: ReportGroup[]
   byStatus: ReportGroup[]
   generatedAt: string
@@ -582,6 +592,7 @@ export interface DashboardData {
   kpis: DashboardKpis
   byCategory: Array<{ name: string; count: number; value: number }>
   byStatus: Array<{ status: AssetStatus; count: number }>
+  byBlock: Array<{ block: OrgBlock; count: number; value: number }>
   byDepartment: Array<{ name: string; count: number; value: number }>
   maintenanceCost: Array<{ month: string; cost: number; count: number }>
   warrantyExpiring: Asset[]

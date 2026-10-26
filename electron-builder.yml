@@ -27,7 +27,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Quản lý thiết bị
+  shortcutName: Quản lý thiết bị UBND xã
   installerLanguages:
     - vi_VN
 

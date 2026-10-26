@@ -38,6 +38,7 @@ import {
   ASSET_STATUS_META,
   MAINTENANCE_STATUS_META,
   MAINTENANCE_TYPE_META,
+  ORG_BLOCK_META,
   hasPermission
 } from '@shared/constants'
 import {
@@ -141,7 +142,7 @@ export function DashboardPage() {
     <div>
       <PageHeader
         title={`${greeting()}, ${user.fullName.split(' ').slice(-1)[0]} 👋`}
-        description={`${today.charAt(0).toUpperCase()}${today.slice(1)} · Tổng quan tình hình tài sản của đơn vị.`}
+        description={`${today.charAt(0).toUpperCase()}${today.slice(1)} · Tổng quan tình hình tài sản của xã.`}
         actions={
           <>
             <Button
@@ -376,16 +377,35 @@ export function DashboardPage() {
         <div className="card p-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="section-title">Thiết bị theo bộ phận</h2>
-              <p className="mt-0.5 text-[11.5px] muted">Phân bố số lượng</p>
+              <h2 className="section-title">Cơ cấu tổ chức</h2>
+              <p className="mt-0.5 text-[11.5px] muted">Thiết bị theo khối và phòng ban</p>
             </div>
             <Package className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            {data.byBlock.map((item) => {
+              const meta = ORG_BLOCK_META[item.block]
+              return (
+                <div
+                  key={item.block}
+                  className="rounded-xl border border-slate-100 bg-slate-50/60 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900/40"
+                >
+                  <p className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">
+                    {meta.label}
+                  </p>
+                  <p className="mt-0.5 text-[17px] font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                    {item.count}
+                  </p>
+                  <p className="text-[10px] text-slate-400">{formatCompactCurrency(item.value)}</p>
+                </div>
+              )
+            })}
           </div>
           {data.byDepartment.length === 0 ? (
             <EmptyState title="Chưa có dữ liệu" className="py-8" />
           ) : (
             <div className="space-y-3">
-              {data.byDepartment.slice(0, 6).map((item) => {
+              {data.byDepartment.slice(0, 5).map((item) => {
                 const max = Math.max(...data.byDepartment.map((dept) => dept.count), 1)
                 return (
                   <div key={item.name}>

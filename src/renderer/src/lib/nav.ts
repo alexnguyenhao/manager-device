@@ -48,7 +48,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Danh mục',
     items: [
       { label: 'Danh mục thiết bị', to: '/categories', icon: Tags },
-      { label: 'Bộ phận', to: '/departments', icon: Building2 },
+      { label: 'Cơ cấu tổ chức', to: '/departments', icon: Building2 },
       { label: 'Vị trí', to: '/locations', icon: MapPin },
       { label: 'Nhà cung cấp', to: '/suppliers', icon: Truck },
       { label: 'Nhân viên', to: '/employees', icon: Users }

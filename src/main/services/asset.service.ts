@@ -30,7 +30,8 @@ import { uploadsDir } from '../lib/paths'
 
 const ASSET_SELECT = `
   SELECT a.*, c.name AS category_name, c.prefix AS category_prefix,
-         d.name AS department_name, l.name AS location_name,
+         d.name AS department_name, d.block AS department_block,
+         l.name AS location_name,
          e.full_name AS assigned_employee_name, s.name AS supplier_name,
          u.full_name AS created_by_name
   FROM assets a
@@ -56,6 +57,7 @@ export interface AssetRow {
   condition: Asset['condition']
   department_id: number | null
   department_name: string | null
+  department_block: Asset['departmentBlock']
   location_id: number | null
   location_name: string | null
   assigned_employee_id: number | null
@@ -119,6 +121,7 @@ export function mapAsset(row: AssetRow): Asset {
     condition: row.condition,
     departmentId: row.department_id ? Number(row.department_id) : null,
     departmentName: row.department_name,
+    departmentBlock: row.department_block ?? null,
     locationId: row.location_id ? Number(row.location_id) : null,
     locationName: row.location_name,
     assignedEmployeeId: row.assigned_employee_id ? Number(row.assigned_employee_id) : null,
@@ -176,6 +179,10 @@ function buildWhere(params: AssetListParams): { sql: string; values: Array<strin
   if (params.departmentId) {
     where.push('a.department_id = ?')
     values.push(params.departmentId)
+  }
+  if (params.block) {
+    where.push('a.department_id IN (SELECT id FROM departments WHERE block = ?)')
+    values.push(params.block)
   }
   if (params.locationId) {
     where.push('a.location_id = ?')

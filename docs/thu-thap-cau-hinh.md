@@ -75,7 +75,7 @@ powershell ... -File .\collect-device-info.ps1 `
 ### Lưu ý khi nhập
 
 - Danh mục trong CSV phải **trùng tên danh mục trong phần mềm**. Mặc định đã khớp với 9 danh mục chuẩn.
-- Các cột Bộ phận / Vị trí / Người sử dụng / Nhà cung cấp để trống vì script không biết dữ liệu của công ty. Sau khi nhập, sửa trong phần mềm hoặc dùng mẫu Excel để điền.
+- Các cột Phòng ban / Vị trí / Người sử dụng / Nhà cung cấp để trống vì script không biết dữ liệu của đơn vị. Sau khi nhập, sửa trong phần mềm hoặc dùng mẫu Excel để điền.
 - Mỗi lần chạy là một bản mới. Tránh nhập trùng cùng một thiết bị.
 - Muốn thu thập nhiều máy: chép thư mục `tools` sang USB, chạy trên từng máy, rồi gom các file CSV lại để nhập.
 
@@ -168,4 +168,4 @@ Get-Printer -ComputerName PC01 | Format-Table Name, DriverName, PortName, Printe
 
 - **CSV từ script**: Thiết bị → Nhập Excel → chọn `.csv`.
 - **Mẫu Excel đầy đủ**: tải tại [Release](https://github.com/alexnguyenhao/manager-device/releases/latest) hoặc trong ứng dụng.
-- Sau khi nhập, cập nhật thêm **Bộ phận, Vị trí, Người sử dụng, Ngày mua, Giá mua** nếu cần.
+- Sau khi nhập, cập nhật thêm **Phòng ban, Vị trí, Người sử dụng, Ngày mua, Giá mua** nếu cần.

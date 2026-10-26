@@ -226,12 +226,12 @@ export function AssignmentFormModal({
             </Select>
           </Field>
           <Field
-            label="Bộ phận"
-            hint={selectedEmployee?.position ?? 'Tự động theo bộ phận của nhân viên.'}
+            label="Phòng ban"
+            hint={selectedEmployee?.position ?? 'Tự động theo phòng ban của nhân viên.'}
             htmlFor="assign-department"
           >
             <Select id="assign-department" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
-              <option value="">Chưa phân bộ phận</option>
+              <option value="">Chưa phân phòng ban</option>
               {departments.map((department) => (
                 <option key={department.id} value={department.id}>
                   {department.name}

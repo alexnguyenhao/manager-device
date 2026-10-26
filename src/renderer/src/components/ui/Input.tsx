@@ -44,7 +44,7 @@ export const Select = forwardRef<
   SelectHTMLAttributes<HTMLSelectElement> & ExtraProps
 >(function Select({ className, invalid, children, ...props }, ref) {
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <select
         ref={ref}
         className={cn('select', invalid && 'field-error', className)}

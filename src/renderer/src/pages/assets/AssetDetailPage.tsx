@@ -357,7 +357,7 @@ export function AssetDetailPage() {
                       <InfoRow label="Số hóa đơn" value={asset.invoiceNumber} />
                       <InfoRow label="Ngày mua" value={formatDate(asset.purchaseDate)} />
                       <InfoRow
-                        label="Bộ phận"
+                        label="Phòng ban"
                         value={asset.departmentName}
                       />
                       <InfoRow label="Vị trí" value={asset.locationName} />
