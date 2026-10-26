@@ -50,6 +50,16 @@ Dữ liệu được lưu trong SQLite tại thư mục người dùng, không g
 
 ---
 
+## Tải bản phát hành
+
+Bộ cài Windows (.exe) và AppImage Linux được tạo tự động bởi GitHub Actions:
+
+**https://github.com/alexnguyenhao/manager-device/releases/latest**
+
+Tải `ManagerDevice-Setup-1.0.0.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng.
+
+---
+
 ## Cài đặt & chạy
 
 ```bash
@@ -174,6 +184,8 @@ managerDevice/
 | `npm run build` | Typecheck + build production vào `out/` |
 | `npm run build:win` | Build và tạo bộ cài Windows trong `release/` |
 | `npm run build:linux` | Build AppImage cho Linux |
+| `npm run seed:catalogs` | Bổ sung danh mục thiết bị mặc định (bỏ qua danh mục đã có) |
+| `npm run reset:data` | Xóa dữ liệu nghiệp vụ, giữ lại tài khoản |
 
 ---
 
