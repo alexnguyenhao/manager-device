@@ -129,8 +129,10 @@ Không cần Administrator, không gửi dữ liệu ra ngoài. Xem hướng d�
 
 ### Gửi công cụ CSV sang máy người khác
 
-- **Chỉ 1 file:** gửi **`TaiVaChay.bat`** — [tải tại đây](https://github.com/alexnguyenhao/manager-device/releases/latest/download/TaiVaChay.bat). File tự tải bộ công cụ mới nhất rồi chạy (máy đích cần Internet lần đầu).
-- **Chép cả thư mục:** tải [ZIP công cụ](https://github.com/alexnguyenhao/manager-device/releases/latest/download/ManagerDevice-CongCu-ThuThap-CauHinh.zip), giải nén, chép cả thư mục `ManagerDevice-CongCu` sang máy đích rồi chạy `ThuThapCauHinh.bat`.
+Công cụ CSV nằm trong thư mục **`tools/`** của kho mã nguồn:
+
+- Chép **cả thư mục `tools`** (gồm `ThuThapCauHinh.bat` và `collect-device-info.ps1`) sang máy đích, sau đó chạy `ThuThapCauHinh.bat`.
+- Không chạy được nếu chỉ gửi mỗi `ThuThapCauHinh.bat`, vì file này cần `collect-device-info.ps1` nằm cùng thư mục.
 - Nếu Windows chặn file tải về: chuột phải → **Properties** → tích **Unblock** → **OK**.
 - Nếu Smart App Control chặn file `.bat`: dùng **Quét máy này** trong Manager Device trên máy đích, hoặc liên hệ quản trị viên để được cấp quyền chạy công cụ.
 

@@ -6,31 +6,21 @@ Có 3 cách, từ nhanh nhất đến đầy đủ nhất.
 
 ---
 
-## Cách 1 — Chạy script tự động (khuyến nghị)
+## Cách 1 — Chạy script CSV tự động (dự phòng)
 
 Script đọc cấu hình máy đang chạy, xuất **CSV nhập thẳng vào phần mềm** và một báo cáo TXT để đọc nhanh.
 
-### Gửi sang máy khác — chọn 1 trong 3 cách
+### Gửi sang máy khác
 
-**Cách A — Gửi duy nhất 1 file `TaiVaChay.bat`** (dễ nhất)
+**Cách A — Chép cả thư mục `tools`** (đầy đủ nhất)
 
-1. Tải **`TaiVaChay.bat`**:
-   https://github.com/alexnguyenhao/manager-device/releases/latest/download/TaiVaChay.bat
-2. Gửi file này qua Zalo / email / USB cho máy đích.
-3. Nhấp đúp để chạy — file tự tải bộ công cụ mới nhất từ GitHub, chạy quét, rồi xoá file tạm.
-
-> Máy đích cần có Internet lần đầu. Nếu bị Windows chặn file tải về: chuột phải file → **Properties** → tích **Unblock** → **OK**.
-
-**Cách B — Tải ZIP rồi chép cả thư mục**
-
-1. Tải bộ công cụ:
-   https://github.com/alexnguyenhao/manager-device/releases/latest/download/ManagerDevice-CongCu-ThuThap-CauHinh.zip
-2. Giải nén, chép **cả thư mục `ManagerDevice-CongCu`** sang máy đích (USB, Zalo, Google Drive…).
+1. Tải hoặc clone kho mã nguồn, lấy **cả thư mục `tools`**.
+2. Chép thư mục này sang máy đích (USB, Zalo, Google Drive…).
 3. Nhấp đúp **`ThuThapCauHinh.bat`** trong thư mục đó.
 
-> Không chạy được nếu chỉ gửi mỗi `ThuThapCauHinh.bat`, vì file này cần `collect-device-info.ps1` nằm cùng thư mục.
+> Không chạy được nếu chỉ gửi mỗi `ThuThapCauHinh.bat`, vì file này cần `collect-device-info.ps1` nằm cùng thư mục. Nếu Windows chặn file tải về: chuột phải file → **Properties** → tích **Unblock** → **OK**.
 
-**Cách C — Không cần tải gì**
+**Cách B — Không cần chép file**
 
 Copy các lệnh PowerShell ở **Cách 2** bên dưới, dán vào PowerShell trên máy đích.
 
