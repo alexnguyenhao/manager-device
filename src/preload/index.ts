@@ -101,6 +101,24 @@ const api: WindowApi = {
     openDataFolder: () => invoke('settings:openDataFolder'),
     clearDemoData: () => invoke('settings:clearDemoData')
   },
+  backup: {
+    overview: () => invoke('backup:overview'),
+    updateConfig: (data) => invoke('backup:updateConfig', data),
+    chooseFolder: (data) => invoke('backup:chooseFolder', data),
+    folderNow: () => invoke('backup:folderNow'),
+    listFolder: () => invoke('backup:listFolder'),
+    restoreFolder: (name) => invoke('backup:restoreFolder', name)
+  },
+  drive: {
+    status: () => invoke('drive:status'),
+    saveConfig: (data) => invoke('drive:saveConfig', data),
+    connect: () => invoke('drive:connect'),
+    disconnect: () => invoke('drive:disconnect'),
+    backup: () => invoke('drive:backup'),
+    list: () => invoke('drive:list'),
+    restore: (id) => invoke('drive:restore', id),
+    remove: (id) => invoke('drive:remove', id)
+  },
   logs: {
     list: (params) => invoke('logs:list', params)
   },

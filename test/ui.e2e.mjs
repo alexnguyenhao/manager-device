@@ -96,6 +96,24 @@ const API_SCRIPT = `
       openDataFolder: () => call('settings:openDataFolder')(),
       clearDemoData: () => call('settings:clearDemoData')()
     },
+    backup: {
+      overview: () => call('backup:overview')(),
+      updateConfig: (d) => call('backup:updateConfig')(d),
+      chooseFolder: (d) => call('backup:chooseFolder')(d),
+      folderNow: () => call('backup:folderNow')(),
+      listFolder: () => call('backup:listFolder')(),
+      restoreFolder: (name) => call('backup:restoreFolder')(name)
+    },
+    drive: {
+      status: () => call('drive:status')(),
+      saveConfig: (d) => call('drive:saveConfig')(d),
+      connect: () => call('drive:connect')(),
+      disconnect: () => call('drive:disconnect')(),
+      backup: () => call('drive:backup')(),
+      list: () => call('drive:list')(),
+      restore: (id) => call('drive:restore')(id),
+      remove: (id) => call('drive:remove')(id)
+    },
     logs: { list: (p) => call('logs:list')(p) },
     files: {
       list: (id) => call('files:list')(id),
@@ -328,6 +346,21 @@ async function main() {
     await page.getByRole('tab', { name: label }).click()
     await settle(page, 500)
     await shot(page, name)
+  }
+
+  await page.getByRole('tab', { name: 'Dữ liệu & sao lưu' }).click()
+  await settle(page, 600)
+  const dataSettingsText = await page.locator('body').innerText()
+  for (const expected of [
+    'Sao lưu tự động',
+    'Google Drive trực tiếp',
+    'OAuth Client ID',
+    'Sao lưu lên Drive',
+    'Bản sao lưu trên Google Drive'
+  ]) {
+    if (!dataSettingsText.includes(expected)) {
+      problems.push(`[settings] Thiếu mục "${expected}"`)
+    }
   }
 
   // Drawer cấp phát: điều hướng kèm query khi đang ở trang cấp phát

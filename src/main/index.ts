@@ -3,10 +3,14 @@ import { join } from 'node:path'
 import { initAppPaths } from './lib/paths'
 import { closeDatabase, openDatabase } from './db/database'
 import { registerIpcHandlers } from './ipc'
+import { shutdownAutoBackup, startAutoBackupScheduler } from './services/backup.service'
 
 initAppPaths()
 
 let mainWindow: BrowserWindow | null = null
+let databaseReady = false
+let allowQuit = false
+let quitTask: Promise<void> | null = null
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -75,6 +79,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   try {
     openDatabase()
+    databaseReady = true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     dialog.showErrorBox(
@@ -88,6 +93,7 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   Menu.setApplicationMenu(null)
   createWindow()
+  startAutoBackupScheduler()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -107,6 +113,44 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', () => {
-  closeDatabase()
+app.on('before-quit', (event) => {
+  if (allowQuit) return
+  event.preventDefault()
+  if (quitTask) return
+
+  quitTask = (async () => {
+    if (!databaseReady) {
+      closeDatabase()
+      allowQuit = true
+      app.quit()
+      return
+    }
+
+    // Sao lưu khi đóng ứng dụng. Giới hạn thời gian để không treo việc thoát.
+    let timedOut = false
+    await Promise.race([
+      shutdownAutoBackup().catch((error) => {
+        console.error('[backup] Không thể hoàn tất sao lưu khi thoát:', error)
+      }),
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          timedOut = true
+          resolve()
+        }, 40_000)
+        timer.unref?.()
+      })
+    ])
+
+    if (timedOut) {
+      console.warn('[backup] Hết thời gian chờ sao lưu khi thoát; đóng ứng dụng.')
+      allowQuit = true
+      app.exit(0)
+      return
+    }
+
+    closeDatabase()
+    databaseReady = false
+    allowQuit = true
+    app.quit()
+  })()
 })

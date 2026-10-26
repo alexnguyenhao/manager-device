@@ -17,10 +17,16 @@ import type {
   AuditSession,
   AuditItemUpdateInput,
   AuthUser,
+  BackupConfigInput,
+  BackupEntry,
+  BackupOverview,
   BackupResult,
   Category,
   CategoryInput,
   DashboardData,
+  DriveConfigInput,
+  DriveConnectResult,
+  DriveStatus,
   Department,
   DepartmentInput,
   Employee,
@@ -131,6 +137,24 @@ export interface WindowApi {
     restore: () => Promise<{ restored: boolean; path?: string }>
     openDataFolder: () => Promise<void>
     clearDemoData: () => Promise<{ removed: number }>
+  }
+  backup: {
+    overview: () => Promise<BackupOverview>
+    updateConfig: (data: BackupConfigInput) => Promise<BackupOverview>
+    chooseFolder: (data?: BackupConfigInput) => Promise<BackupOverview | null>
+    folderNow: () => Promise<BackupResult>
+    listFolder: () => Promise<BackupEntry[]>
+    restoreFolder: (name: string) => Promise<{ restored: boolean; path?: string }>
+  }
+  drive: {
+    status: () => Promise<DriveStatus>
+    saveConfig: (data: DriveConfigInput) => Promise<DriveStatus>
+    connect: () => Promise<DriveConnectResult>
+    disconnect: () => Promise<DriveStatus>
+    backup: () => Promise<BackupEntry>
+    list: () => Promise<BackupEntry[]>
+    restore: (id: string) => Promise<{ restored: boolean; path?: string }>
+    remove: (id: string) => Promise<void>
   }
   logs: {
     list: (params: LogListParams) => Promise<PageResult<ActivityLog>>

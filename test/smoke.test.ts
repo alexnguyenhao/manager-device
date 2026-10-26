@@ -326,6 +326,77 @@ async function main(): Promise<void> {
   const detail = getAssetDetail(created.id)
   if (detail.logs.length === 0) throw new Error('Asset logs missing')
 
+  const {
+    backupToFolderNow,
+    getBackupOverview,
+    listFolderBackups,
+    runAutoBackup,
+    updateBackupConfig
+  } = await import('../src/main/services/backup.service')
+  const { disconnectDrive, getDriveStatus, saveDriveConfig } = await import(
+    '../src/main/services/drive.service'
+  )
+
+  const backupFolder = join(dataDir, 'smoke-backups')
+  const folderConfig = updateBackupConfig(
+    {
+      backupFolder,
+      retention: 2,
+      autoBackupEnabled: false,
+      driveBackupEnabled: false
+    },
+    admin
+  )
+  if (folderConfig.config.retention !== 2) throw new Error('Backup config retention failed')
+  if (!folderConfig.folderAvailable) throw new Error('Backup folder not available')
+
+  await backupToFolderNow(admin)
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  await backupToFolderNow(admin)
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  await backupToFolderNow(admin)
+  const folderEntries = listFolderBackups()
+  if (folderEntries.length !== 2) {
+    throw new Error(`Backup retention failed: ${folderEntries.length} files`)
+  }
+
+  const disabledAuto = await runAutoBackup('manual')
+  if (disabledAuto.ran || disabledAuto.skipped !== 'disabled') {
+    throw new Error('Auto backup should be disabled')
+  }
+
+  updateBackupConfig({ autoBackupEnabled: true }, admin)
+  const autoResult = await runAutoBackup('manual')
+  if (!autoResult.ran || !autoResult.folderFile) {
+    throw new Error(`Auto backup failed: ${JSON.stringify(autoResult)}`)
+  }
+  if (listFolderBackups().length !== 2) throw new Error('Auto backup retention failed')
+  const autoOverview = getBackupOverview()
+  if (autoOverview.state.lastBackupStatus !== 'success') {
+    throw new Error('Auto backup state not recorded')
+  }
+  if (autoOverview.state.lastBackupTarget !== 'folder') {
+    throw new Error('Auto backup target not recorded')
+  }
+  if (!autoOverview.lastAutoBackupAt) throw new Error('Auto backup timestamp missing')
+  updateBackupConfig({ autoBackupEnabled: false }, admin)
+
+  const driveStatus = getDriveStatus()
+  if (driveStatus.configured || driveStatus.connected) {
+    throw new Error('Drive should start unconfigured')
+  }
+  const configuredDrive = saveDriveConfig({
+    clientId: 'test-client.apps.googleusercontent.com',
+    clientSecret: 'test-secret'
+  })
+  if (!configuredDrive.configured || configuredDrive.connected) {
+    throw new Error('Drive config save failed')
+  }
+  const disconnectedDrive = await disconnectDrive()
+  if (!disconnectedDrive.configured || disconnectedDrive.connected) {
+    throw new Error('Drive disconnect failed')
+  }
+
   const previousSave = process.env.MD_TEST_SAVE
   const previousImport = process.env.MD_TEST_IMPORT
   const backupFile = join(dataDir, 'smoke-backup.db')

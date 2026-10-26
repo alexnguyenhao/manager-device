@@ -5,7 +5,7 @@
 
 Phần mềm quản lý thiết bị và tài sản công dành cho **UBND cấp xã**, chạy **hoàn toàn cục bộ** trên máy tính Windows/Linux. Ứng dụng giúp theo dõi toàn bộ vòng đời tài sản: tiếp nhận, cấu hình, cấp phát, bảo trì, kiểm kê, khấu hao và thanh lý — tất cả trong một giao diện tiếng Việt duy nhất.
 
-Dữ liệu được lưu trong SQLite tại thư mục người dùng, không gửi lên máy chủ và không cần kết nối Internet.
+Dữ liệu được lưu trong SQLite tại thư mục người dùng, không gửi lên máy chủ và không cần kết nối Internet. Nếu bạn chủ động bật sao lưu Google Drive, bản snapshot mới được tải lên tài khoản Drive của bạn.
 
 ---
 
@@ -168,6 +168,31 @@ Nên đổi mật khẩu mặc định sau khi bắt đầu sử dụng thật.
 - **Sao lưu:** Cài đặt → Dữ liệu & sao lưu → Sao lưu ngay. Tệp `.db` có thể cất giữ hoặc chuyển sang máy khác.
 - **Phục hồi:** Chọn tệp `.db` đã sao lưu. Ứng dụng sẽ thay thế dữ liệu hiện tại và tự khởi động lại.
 - **Tạo lại dữ liệu mẫu:** Đóng ứng dụng, xóa `%APPDATA%\Manager Device\data\manager-device.db`, sau đó mở lại. Ứng dụng sẽ tạo lại dữ liệu và tài khoản demo.
+
+### Sao lưu tự động
+
+Vào **Cài đặt → Dữ liệu & sao lưu → Sao lưu tự động**:
+
+- **Bật sao lưu tự động:** ứng dụng tạo bản snapshot khi đóng app và mỗi 24 giờ một lần trong lúc app đang mở.
+- **Thư mục sao lưu:** chọn thư mục bất kỳ, hoặc thư mục Google Drive for desktop (ví dụ `G:\My Drive\Manager Device`).
+- **Số bản giữ lại:** từ 1 đến 100; các bản cũ nhất tự động bị xóa.
+- **Kèm Google Drive:** tải thêm bản snapshot lên Google Drive trực tiếp nếu đã kết nối.
+
+Ứng dụng không đồng bộ trực tiếp tệp SQLite đang chạy. Mỗi lần sao lưu đều dùng `VACUUM INTO` để tạo snapshot nhất quán, sau đó mới ghi vào thư mục hoặc tải lên Drive. Tên tệp có dạng `manager-device-backup-YYYYMMDD-HHmmss-SSS.db`.
+
+### Google Drive trực tiếp (OAuth)
+
+Tính năng này cho phép tải bản sao lưu lên Drive mà không cần cài Google Drive for desktop.
+
+1. Mở [Google Cloud Console](https://console.cloud.google.com/) và tạo/chọn một project.
+2. Bật **Google Drive API** trong **APIs & Services → Library**.
+3. Cấu hình **OAuth consent screen** (Internal nếu dùng Google Workspace, hoặc External kèm test users).
+4. Vào **Credentials → Create credentials → OAuth client ID → Desktop app**.
+5. Dán **Client ID** và **Client Secret** vào Cài đặt → Google Drive trực tiếp, bấm **Kết nối Google Drive** và đăng nhập bằng trình duyệt.
+
+Ứng dụng chỉ xin quyền `drive.file` — chỉ đọc/ghi các tệp do chính ứng dụng tạo. Bản sao lưu được lưu trong thư mục **Manager Device Backups** trên Drive. Refresh token và OAuth secret được lưu cục bộ trong `%APPDATA%\Manager Device\drive-auth.json`, mã hóa bằng Windows `safeStorage` khi khả dụng.
+
+> Lưu ý: OAuth Client Secret của ứng dụng desktop không được coi là bí mật tuyệt đối. Hãy giới hạn OAuth consent screen ở Internal hoặc chỉ thêm người dùng tin cậy nếu dùng External.
 
 ### Khởi tạo dữ liệu chính (chỉ giữ tài khoản)
 

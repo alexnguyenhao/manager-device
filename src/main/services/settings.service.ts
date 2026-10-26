@@ -1,13 +1,16 @@
-import { cpSync, existsSync, readdirSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { join, basename, resolve } from 'node:path'
-import { app, dialog, shell } from 'electron'
-import { DatabaseSync } from 'node:sqlite'
-import type { AppInfo, AppSettings, AuthUser, BackupResult, SettingsInput } from '../../shared/types'
-import { AppError } from '../lib/errors'
+import { readdirSync, rmSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import { app, shell } from 'electron'
+import type { AppInfo, AppSettings, AuthUser, SettingsInput } from '../../shared/types'
 import { dataDir, dbPath, uploadsDir } from '../lib/paths'
-import { closeDatabase, getDb, openDatabase } from '../db/database'
+import { getDb } from '../db/database'
 import { logActivity } from './log.service'
 import { nowISO } from '../../shared/utils'
+
+export {
+  createManualBackup as createBackup,
+  restoreManualBackup as restoreBackup
+} from './backup.service'
 
 export const DEFAULT_SETTINGS: AppSettings = {
   companyName: 'Ủy ban nhân dân xã',
@@ -89,18 +92,6 @@ export function updateSettings(data: SettingsInput, user: AuthUser): AppSettings
   return getSettings()
 }
 
-function samePath(a: string, b: string): boolean {
-  const left = resolve(a)
-  const right = resolve(b)
-  return process.platform === 'win32'
-    ? left.toLowerCase() === right.toLowerCase()
-    : left === right
-}
-
-function isLiveDatabaseFile(path: string): boolean {
-  return [dbPath(), `${dbPath()}-wal`, `${dbPath()}-shm`].some((file) => samePath(path, file))
-}
-
 export function getAppInfo(): AppInfo {
   let size = 0
   try {
@@ -118,134 +109,6 @@ export function getAppInfo(): AppInfo {
     uploadsPath: uploadsDir(),
     dbSize: size
   }
-}
-
-export async function createBackup(user: AuthUser): Promise<BackupResult> {
-  const defaultName = `manager-device-${new Date().toISOString().slice(0, 10)}.db`
-  const result = await dialog.showSaveDialog({
-    title: 'Sao lưu cơ sở dữ liệu',
-    defaultPath: join(app.getPath('documents'), defaultName),
-    filters: [{ name: 'Cơ sở dữ liệu SQLite', extensions: ['db'] }]
-  })
-  if (result.canceled || !result.filePath) return { canceled: true }
-
-  const target = result.filePath
-  if (isLiveDatabaseFile(target)) {
-    throw new AppError(
-      'Không thể sao lưu đè lên tệp cơ sở dữ liệu đang sử dụng. Vui lòng chọn vị trí khác.',
-      'BAD_REQUEST'
-    )
-  }
-
-  const db = getDb()
-  try {
-    // VACUUM INTO yêu cầu tệp đích chưa tồn tại.
-    if (existsSync(target)) unlinkSync(target)
-    db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
-    const escaped = target.replace(/'/g, "''")
-    db.exec(`VACUUM INTO '${escaped}'`)
-  } catch (error) {
-    if (error instanceof AppError) throw error
-    throw new AppError(
-      'Không thể tạo tệp sao lưu. Vui lòng kiểm tra quyền ghi và dung lượng ổ đĩa.',
-      'INTERNAL'
-    )
-  }
-  logActivity(user, 'Sao lưu dữ liệu', 'settings', null, basename(target))
-  return { canceled: false, path: target }
-}
-
-export async function restoreBackup(user: AuthUser): Promise<{ restored: boolean; path?: string }> {
-  const result = await dialog.showOpenDialog({
-    title: 'Chọn tệp sao lưu để phục hồi',
-    properties: ['openFile'],
-    filters: [{ name: 'Cơ sở dữ liệu SQLite', extensions: ['db', 'sqlite', 'sqlite3'] }]
-  })
-  if (result.canceled || result.filePaths.length === 0) return { restored: false }
-  const source = result.filePaths[0]
-  if (isLiveDatabaseFile(source)) {
-    throw new AppError(
-      'Không thể phục hồi từ tệp cơ sở dữ liệu đang sử dụng. Vui lòng chọn tệp sao lưu khác.',
-      'BAD_REQUEST'
-    )
-  }
-
-  try {
-    const test = new DatabaseSync(source, { readOnly: true })
-    const tables = test
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-      .all() as Array<{ name: string }>
-    test.close()
-    const names = new Set(tables.map((t) => t.name))
-    if (!names.has('users') || !names.has('assets') || !names.has('settings')) {
-      throw new AppError('Tệp đã chọn không phải bản sao lưu hợp lệ của phần mềm.', 'BAD_REQUEST')
-    }
-  } catch (error) {
-    if (error instanceof AppError) throw error
-    throw new AppError('Không thể đọc tệp sao lưu. Tệp có thể bị hỏng.', 'BAD_REQUEST')
-  }
-
-  const confirmed = await dialog.showMessageBox({
-    type: 'warning',
-    title: 'Xác nhận phục hồi',
-    message: 'Phục hồi dữ liệu sẽ thay thế toàn bộ dữ liệu hiện tại.',
-    detail: 'Ứng dụng sẽ tự khởi động lại sau khi phục hồi. Bạn có chắc chắn?',
-    buttons: ['Phục hồi', 'Hủy'],
-    defaultId: 1,
-    cancelId: 1
-  })
-  if (confirmed.response !== 0) return { restored: false }
-
-  logActivity(user, 'Phục hồi dữ liệu', 'settings', null, basename(source))
-  const safetyCopy = `${dbPath()}.pre-restore`
-  let closed = false
-
-  const removeJournals = (): void => {
-    for (const suffix of ['-wal', '-shm']) {
-      const file = `${dbPath()}${suffix}`
-      if (existsSync(file)) unlinkSync(file)
-    }
-  }
-
-  try {
-    getDb().exec('PRAGMA wal_checkpoint(TRUNCATE)')
-    closeDatabase()
-    closed = true
-    // Giữ một bản sao an toàn để khôi phục nếu quá trình ghi đè gặp lỗi.
-    cpSync(dbPath(), safetyCopy)
-    cpSync(source, dbPath())
-    removeJournals()
-    openDatabase()
-  } catch {
-    if (closed) {
-      try {
-        closeDatabase()
-        if (existsSync(safetyCopy)) cpSync(safetyCopy, dbPath())
-        removeJournals()
-        openDatabase()
-      } catch {
-        // Không thể khôi phục tự động; người dùng có thể dùng lại tệp sao lưu.
-      }
-    }
-    try {
-      if (existsSync(safetyCopy)) unlinkSync(safetyCopy)
-    } catch {
-      // bỏ qua
-    }
-    throw new AppError('Không thể phục hồi dữ liệu. Dữ liệu hiện tại đã được giữ nguyên.', 'INTERNAL')
-  }
-
-  try {
-    if (existsSync(safetyCopy)) unlinkSync(safetyCopy)
-  } catch {
-    // bỏ qua
-  }
-
-  setTimeout(() => {
-    app.relaunch()
-    app.exit(0)
-  }, 700)
-  return { restored: true, path: source }
 }
 
 export async function openDataFolder(): Promise<void> {

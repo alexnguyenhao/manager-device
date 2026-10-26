@@ -12,7 +12,14 @@ export const app = {
 }
 
 export const dialog = {
-  showOpenDialog: async (): Promise<{ canceled: boolean; filePaths: string[] }> => {
+  showOpenDialog: async (options?: {
+    properties?: string[]
+  }): Promise<{ canceled: boolean; filePaths: string[] }> => {
+    if (options?.properties?.includes('openDirectory')) {
+      const folder = process.env.MD_TEST_FOLDER
+      if (folder) return { canceled: false, filePaths: [folder] }
+      return { canceled: true, filePaths: [] }
+    }
     const importPath = process.env.MD_TEST_IMPORT
     if (importPath) return { canceled: false, filePaths: [importPath] }
     return { canceled: true, filePaths: [] }
@@ -26,7 +33,15 @@ export const dialog = {
 }
 
 export const shell = {
-  openPath: async (): Promise<string> => ''
+  openPath: async (): Promise<string> => '',
+  openExternal: async (): Promise<void> => undefined
+}
+
+/** Stub cho lưu token Google Drive khi chạy ngoài Electron. */
+export const safeStorage = {
+  isEncryptionAvailable: (): boolean => false,
+  encryptString: (value: string): Buffer => Buffer.from(value, 'utf8'),
+  decryptString: (value: Buffer): string => value.toString('utf8')
 }
 
 type IpcHandler = (event: unknown, ...args: unknown[]) => unknown

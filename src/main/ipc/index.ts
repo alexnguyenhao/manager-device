@@ -77,14 +77,32 @@ import {
 } from '../services/audit.service'
 import { buildReport } from '../services/report.service'
 import {
-  createBackup,
   clearBusinessData,
   getAppInfo,
   getSettings,
   openDataFolder,
-  restoreBackup,
   updateSettings
 } from '../services/settings.service'
+import {
+  backupToDriveNow,
+  backupToFolderNow,
+  chooseBackupFolder,
+  createManualBackup as createBackup,
+  getBackupOverview,
+  listDriveBackups,
+  listFolderBackups,
+  removeDriveBackup,
+  restoreDriveBackup,
+  restoreFolderBackup,
+  restoreManualBackup as restoreBackup,
+  updateBackupConfig
+} from '../services/backup.service'
+import {
+  connectDrive,
+  disconnectDrive,
+  getDriveStatus,
+  saveDriveConfig
+} from '../services/drive.service'
 import {
   createUser,
   deleteUser,
@@ -111,12 +129,16 @@ import {
   assetSchema,
   assignmentSchema,
   auditCompleteSchema,
+  backupConfigSchema,
+  backupNameSchema,
   auditCreateSchema,
   auditItemSchema,
   auditScanSchema,
   categorySchema,
   changePasswordSchema,
   departmentSchema,
+  driveConfigSchema,
+  driveFileIdSchema,
   employeeSchema,
   idSchema,
   idsSchema,
@@ -490,6 +512,48 @@ export function registerIpcHandlers(): void {
     permission: 'settings:write'
   })
   handle('app:info', () => getAppInfo())
+
+  /* -------------------------------- Backup ------------------------------- */
+  handle('backup:overview', () => getBackupOverview())
+  handle(
+    'backup:updateConfig',
+    (user, payload) => updateBackupConfig(parse(backupConfigSchema, payload), user!),
+    { permission: 'settings:write' }
+  )
+  handle(
+    'backup:chooseFolder',
+    (user, payload) =>
+      chooseBackupFolder(
+        user!,
+        payload === undefined ? {} : parse(backupConfigSchema, payload)
+      ),
+    { permission: 'settings:write' }
+  )
+  handle('backup:folderNow', (user) => backupToFolderNow(user!), { permission: 'backup' })
+  handle('backup:listFolder', () => listFolderBackups(), { permission: 'backup' })
+  handle(
+    'backup:restoreFolder',
+    (user, name) => restoreFolderBackup(parse(backupNameSchema, name), user!),
+    { permission: 'settings:write' }
+  )
+
+  /* ----------------------------- Google Drive ---------------------------- */
+  handle('drive:status', () => getDriveStatus())
+  handle('drive:saveConfig', (_user, payload) => saveDriveConfig(parse(driveConfigSchema, payload)), {
+    permission: 'settings:write'
+  })
+  handle('drive:connect', () => connectDrive(), { permission: 'settings:write' })
+  handle('drive:disconnect', () => disconnectDrive(), { permission: 'settings:write' })
+  handle('drive:backup', (user) => backupToDriveNow(user!), { permission: 'backup' })
+  handle('drive:list', () => listDriveBackups(), { permission: 'backup' })
+  handle(
+    'drive:restore',
+    (user, id) => restoreDriveBackup(parse(driveFileIdSchema, id), user!),
+    { permission: 'settings:write' }
+  )
+  handle('drive:remove', (_user, id) => removeDriveBackup(parse(driveFileIdSchema, id)), {
+    permission: 'backup'
+  })
 
   /* --------------------------------- Logs -------------------------------- */
   handle('logs:list', (_user, params) => listLogs(parse(logListSchema, params ?? {})), {

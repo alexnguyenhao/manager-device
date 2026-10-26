@@ -671,6 +671,81 @@ export interface BackupResult {
   files?: number
 }
 
+/* ------------------------------- Backup -------------------------------- */
+
+export type BackupTarget = 'manual' | 'folder' | 'drive' | 'folder+drive'
+export type BackupRunStatus = 'never' | 'success' | 'failed'
+
+export interface BackupConfig {
+  /** Bật sao lưu tự động khi đóng ứng dụng và mỗi ngày. */
+  autoBackupEnabled: boolean
+  /** Thư mục nhận bản sao lưu (có thể là thư mục Google Drive). */
+  backupFolder: string
+  /** Số bản sao lưu gần nhất được giữ lại. */
+  retention: number
+  /** Tự động tải bản sao lưu lên Google Drive nếu đã kết nối. */
+  driveBackupEnabled: boolean
+}
+
+export type BackupConfigInput = Partial<BackupConfig>
+
+export interface BackupState {
+  lastBackupAt: string | null
+  lastBackupStatus: BackupRunStatus
+  lastBackupTarget: BackupTarget | null
+  lastBackupFile: string | null
+  lastBackupMessage: string | null
+}
+
+export interface BackupEntry {
+  name: string
+  /** Đường dẫn tuyệt đối với bản sao lưu trong thư mục, không có với Drive. */
+  path?: string
+  /** ID tệp trên Google Drive. */
+  id?: string
+  size: number
+  createdAt: string
+  target: 'folder' | 'drive'
+}
+
+export interface BackupOverview {
+  config: BackupConfig
+  state: BackupState
+  folderAvailable: boolean
+  lastAutoBackupAt: string | null
+}
+
+export interface AutoBackupResult {
+  ran: boolean
+  skipped?: 'disabled' | 'no-target' | 'not-due'
+  folderFile?: string
+  driveFile?: string
+  message?: string
+}
+
+/* ---------------------------- Google Drive ----------------------------- */
+
+export interface DriveStatus {
+  configured: boolean
+  connected: boolean
+  accountEmail: string | null
+  folderId: string | null
+  lastSyncAt: string | null
+  scope: string
+  clientId: string
+  secretConfigured: boolean
+}
+
+export interface DriveConfigInput {
+  clientId: string
+  clientSecret?: string
+}
+
+export interface DriveConnectResult {
+  connected: boolean
+  accountEmail: string | null
+}
+
 /* ------------------------------- Common -------------------------------- */
 
 export interface PageResult<T> {

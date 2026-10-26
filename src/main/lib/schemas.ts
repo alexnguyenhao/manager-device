@@ -325,3 +325,25 @@ export const logListSchema = z.object({
 
 export const idSchema = z.coerce.number().int().positive()
 export const idsSchema = z.array(z.coerce.number().int().positive()).min(1)
+
+export const backupConfigSchema = z.object({
+  autoBackupEnabled: z.boolean().optional(),
+  backupFolder: z.string().trim().max(1000).optional(),
+  retention: z.coerce.number().int().min(1).max(100).optional(),
+  driveBackupEnabled: z.boolean().optional()
+})
+
+export const backupNameSchema = z
+  .string()
+  .trim()
+  .regex(/^manager-device-backup-\d{8}-\d{6}(?:-\d{3})?\.db$/, 'Tên tệp sao lưu không hợp lệ.')
+
+export const driveConfigSchema = z.object({
+  clientId: z.string().trim().min(10, 'Vui lòng nhập OAuth Client ID.').max(200),
+  clientSecret: z.string().trim().max(300).optional()
+})
+
+export const driveFileIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9_-]+$/, 'Mã tệp Google Drive không hợp lệ.')

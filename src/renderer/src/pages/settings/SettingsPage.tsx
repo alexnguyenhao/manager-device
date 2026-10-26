@@ -3,13 +3,19 @@ import {
   Building2,
   Check,
   CircleAlert,
+  Cloud,
+  CloudDownload,
+  CloudUpload,
   Copy,
   Database,
   Download,
   FolderOpen,
+  FolderSync,
   HardDrive,
   Info,
   KeyRound,
+  Link2,
+  LogOut,
   MonitorSmartphone,
   RefreshCw,
   RotateCcw,
@@ -20,16 +26,23 @@ import {
   Trash2,
   Upload
 } from 'lucide-react'
-import type { AppInfo, AppSettings } from '@shared/types'
+import type {
+  AppInfo,
+  AppSettings,
+  BackupConfig,
+  BackupEntry,
+  BackupOverview,
+  DriveStatus
+} from '@shared/types'
 import { hasPermission } from '@shared/constants'
-import { formatNumber } from '@shared/utils'
+import { formatDateTime, formatNumber } from '@shared/utils'
 import { api, errorMessage } from '../../lib/api'
 import { useCurrentUser } from '../../store/auth'
 import { toast } from '../../store/toast'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { Field, Input, Select, Textarea } from '../../components/ui/Input'
+import { Field, Input, Select, Switch, Textarea } from '../../components/ui/Input'
 import { Tabs, type TabItem } from '../../components/ui/Tabs'
 import { EmptyState, Spinner } from '../../components/ui/Feedback'
 import { useConfirm } from '../../components/ui/Confirm'
@@ -43,6 +56,13 @@ const TABS: TabItem<SettingsTab>[] = [
   { value: 'data', label: 'Dữ liệu & sao lưu', icon: <Database className="h-3.5 w-3.5" /> },
   { value: 'about', label: 'Thông tin ứng dụng', icon: <Info className="h-3.5 w-3.5" /> }
 ]
+
+const BACKUP_TARGET_LABELS: Record<string, string> = {
+  manual: 'Tệp thủ công',
+  folder: 'Thư mục sao lưu',
+  drive: 'Google Drive',
+  'folder+drive': 'Thư mục + Google Drive'
+}
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 KB'
@@ -66,28 +86,86 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [draft, setDraft] = useState<AppSettings | null>(null)
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [backup, setBackup] = useState<BackupOverview | null>(null)
+  const [backupDraft, setBackupDraft] = useState<BackupConfig | null>(null)
+  const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null)
+  const [folderBackups, setFolderBackups] = useState<BackupEntry[]>([])
+  const [driveBackups, setDriveBackups] = useState<BackupEntry[]>([])
+  const [driveForm, setDriveForm] = useState({ clientId: '', clientSecret: '' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [busyAction, setBusyAction] = useState<'backup' | 'restore' | 'clear' | null>(null)
+  const [busyAction, setBusyAction] = useState<
+    | 'backup'
+    | 'restore'
+    | 'clear'
+    | 'folder-backup'
+    | 'folder-restore'
+    | 'folder-choose'
+    | 'backup-config'
+    | 'drive-save'
+    | 'drive-connect'
+    | 'drive-disconnect'
+    | 'drive-backup'
+    | 'drive-restore'
+    | 'drive-remove'
+    | null
+  >(null)
 
   const canWrite = hasPermission(user.role, 'settings:write')
   const canBackup = hasPermission(user.role, 'backup')
+
+  const refreshFolderBackups = useCallback(async () => {
+    if (!canBackup) return
+    try {
+      setFolderBackups(await api.backup.listFolder())
+    } catch {
+      setFolderBackups([])
+    }
+  }, [canBackup])
+
+  const refreshDriveBackups = useCallback(async () => {
+    if (!canBackup) return
+    try {
+      setDriveBackups(await api.drive.list())
+    } catch {
+      setDriveBackups([])
+    }
+  }, [canBackup])
+
+  const applyBackupOverview = useCallback(
+    (overview: BackupOverview) => {
+      setBackup(overview)
+      setBackupDraft(overview.config)
+      void refreshFolderBackups()
+    },
+    [refreshFolderBackups]
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [settingsResult, infoResult] = await Promise.all([api.settings.get(), api.app.info()])
+      const [settingsResult, infoResult, backupResult, driveResult] = await Promise.all([
+        api.settings.get(),
+        api.app.info(),
+        api.backup.overview(),
+        api.drive.status()
+      ])
       setSettings(settingsResult)
       setDraft(settingsResult)
       setAppInfo(infoResult)
+      applyBackupOverview(backupResult)
+      setDriveStatus(driveResult)
+      setDriveForm({ clientId: driveResult.clientId, clientSecret: '' })
+      if (driveResult.connected) void refreshDriveBackups()
+      else setDriveBackups([])
     } catch (err) {
       setError(errorMessage(err))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [applyBackupOverview, refreshDriveBackups])
 
   useEffect(() => {
     void load()
@@ -95,6 +173,9 @@ export function SettingsPage() {
 
   const dirty = Boolean(
     settings && draft && JSON.stringify(settings) !== JSON.stringify(draft)
+  )
+  const backupDirty = Boolean(
+    backup && backupDraft && JSON.stringify(backup.config) !== JSON.stringify(backupDraft)
   )
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]): void => {
@@ -127,7 +208,7 @@ export function SettingsPage() {
     }
   }
 
-  const backup = async (): Promise<void> => {
+  const backupToFile = async (): Promise<void> => {
     setBusyAction('backup')
     try {
       const result = await api.settings.backup()
@@ -199,6 +280,219 @@ export function SettingsPage() {
       toast.error('Không thể sao chép', 'Vui lòng sao chép thủ công từ ô văn bản.')
     }
   }
+
+  const updateBackup = <K extends keyof BackupConfig>(key: K, value: BackupConfig[K]): void => {
+    setBackupDraft((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
+
+  const saveBackupConfig = async (): Promise<void> => {
+    if (!backupDraft) return
+    setBusyAction('backup-config')
+    try {
+      const overview = await api.backup.updateConfig(backupDraft)
+      applyBackupOverview(overview)
+      toast.success('Đã lưu thiết lập sao lưu')
+    } catch (err) {
+      toast.error('Không thể lưu thiết lập sao lưu', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const chooseFolder = async (): Promise<void> => {
+    setBusyAction('folder-choose')
+    try {
+      const overview = await api.backup.chooseFolder(backupDraft ?? undefined)
+      if (overview) {
+        applyBackupOverview(overview)
+        toast.success('Đã chọn thư mục sao lưu', overview.config.backupFolder)
+      }
+    } catch (err) {
+      toast.error('Không thể chọn thư mục sao lưu', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const folderBackup = async (): Promise<void> => {
+    setBusyAction('folder-backup')
+    try {
+      const result = await api.backup.folderNow()
+      toast.success('Đã sao lưu vào thư mục', result.path)
+      applyBackupOverview(await api.backup.overview())
+    } catch (err) {
+      toast.error('Không thể sao lưu vào thư mục', errorMessage(err))
+      applyBackupOverview(await api.backup.overview())
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const restoreFolder = async (entry: BackupEntry): Promise<void> => {
+    const ok = await confirm({
+      title: 'Phục hồi từ bản sao lưu này?',
+      description: `Toàn bộ dữ liệu hiện tại sẽ được thay thế bằng bản sao lưu:\n${entry.name}\n\nỨng dụng sẽ tự khởi động lại sau khi phục hồi.`,
+      confirmText: 'Phục hồi'
+    })
+    if (!ok) return
+    setBusyAction('folder-restore')
+    try {
+      const result = await api.backup.restoreFolder(entry.name)
+      if (result.restored) {
+        toast.info('Đang phục hồi dữ liệu', 'Ứng dụng sẽ khởi động lại trong giây lát…')
+      }
+    } catch (err) {
+      toast.error('Không thể phục hồi dữ liệu', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const saveDriveConfig = async (): Promise<void> => {
+    if (!driveForm.clientId.trim()) {
+      toast.error('Thiếu OAuth Client ID', 'Vui lòng nhập Client ID từ Google Cloud Console.')
+      return
+    }
+    setBusyAction('drive-save')
+    try {
+      const status = await api.drive.saveConfig({
+        clientId: driveForm.clientId,
+        clientSecret: driveForm.clientSecret.trim() || undefined
+      })
+      setDriveStatus(status)
+      setDriveForm({ clientId: status.clientId, clientSecret: '' })
+      toast.success('Đã lưu cấu hình Google Drive')
+    } catch (err) {
+      toast.error('Không thể lưu cấu hình Google Drive', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const connectDrive = async (): Promise<void> => {
+    if (!driveForm.clientId.trim()) {
+      toast.error('Thiếu OAuth Client ID', 'Vui lòng nhập Client ID từ Google Cloud Console.')
+      return
+    }
+    const configChanged =
+      driveForm.clientId.trim() !== (driveStatus?.clientId ?? '') ||
+      driveForm.clientSecret.trim().length > 0
+    setBusyAction('drive-connect')
+    try {
+      if (configChanged) {
+        const status = await api.drive.saveConfig({
+          clientId: driveForm.clientId,
+          clientSecret: driveForm.clientSecret.trim() || undefined
+        })
+        setDriveStatus(status)
+        setDriveForm({ clientId: status.clientId, clientSecret: '' })
+      }
+      const result = await api.drive.connect()
+      const status = await api.drive.status()
+      setDriveStatus(status)
+      setDriveForm({ clientId: status.clientId, clientSecret: '' })
+      toast.success(
+        'Đã kết nối Google Drive',
+        result.accountEmail ? `Tài khoản: ${result.accountEmail}` : undefined
+      )
+      void refreshDriveBackups()
+    } catch (err) {
+      toast.error('Không thể kết nối Google Drive', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const disconnectDrive = async (): Promise<void> => {
+    const ok = await confirm({
+      title: 'Ngắt kết nối Google Drive?',
+      description:
+        'Ứng dụng sẽ xóa token đăng nhập đã lưu. Các bản sao lưu trên Google Drive vẫn được giữ nguyên.',
+      confirmText: 'Ngắt kết nối'
+    })
+    if (!ok) return
+    setBusyAction('drive-disconnect')
+    try {
+      const status = await api.drive.disconnect()
+      setDriveStatus(status)
+      setDriveBackups([])
+      toast.success('Đã ngắt kết nối Google Drive')
+    } catch (err) {
+      toast.error('Không thể ngắt kết nối Google Drive', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const driveBackup = async (): Promise<void> => {
+    setBusyAction('drive-backup')
+    try {
+      const entry = await api.drive.backup()
+      toast.success('Đã sao lưu lên Google Drive', entry.name)
+      applyBackupOverview(await api.backup.overview())
+      void refreshDriveBackups()
+      setDriveStatus(await api.drive.status())
+    } catch (err) {
+      toast.error('Không thể sao lưu lên Google Drive', errorMessage(err))
+      applyBackupOverview(await api.backup.overview())
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const restoreDrive = async (entry: BackupEntry): Promise<void> => {
+    if (!entry.id) return
+    const ok = await confirm({
+      title: 'Phục hồi từ Google Drive?',
+      description: `Toàn bộ dữ liệu hiện tại sẽ được thay thế bằng bản sao lưu:\n${entry.name}\n\nỨng dụng sẽ tự khởi động lại sau khi phục hồi.`,
+      confirmText: 'Phục hồi'
+    })
+    if (!ok) return
+    setBusyAction('drive-restore')
+    try {
+      const result = await api.drive.restore(entry.id)
+      if (result.restored) {
+        toast.info('Đang phục hồi dữ liệu', 'Ứng dụng sẽ khởi động lại trong giây lát…')
+      }
+    } catch (err) {
+      toast.error('Không thể phục hồi từ Google Drive', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const removeDrive = async (entry: BackupEntry): Promise<void> => {
+    if (!entry.id) return
+    const ok = await confirm({
+      title: 'Xóa bản sao lưu trên Google Drive?',
+      description: `Bản sao lưu "${entry.name}" sẽ bị xóa khỏi Google Drive. Thao tác không thể hoàn tác.`,
+      confirmText: 'Xóa vĩnh viễn'
+    })
+    if (!ok) return
+    setBusyAction('drive-remove')
+    try {
+      await api.drive.remove(entry.id)
+      toast.success('Đã xóa bản sao lưu trên Google Drive')
+      void refreshDriveBackups()
+    } catch (err) {
+      toast.error('Không thể xóa bản sao lưu', errorMessage(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const autoNeedsTarget = Boolean(
+    backup?.config.autoBackupEnabled &&
+      !backup.config.backupFolder &&
+      !(backup.config.driveBackupEnabled && driveStatus?.connected)
+  )
+  const lastStatusTone =
+    backup?.state.lastBackupStatus === 'success'
+      ? 'success'
+      : backup?.state.lastBackupStatus === 'failed'
+        ? 'danger'
+        : 'neutral'
+  const backupBusy = busyAction !== null
 
   if (loading) {
     return <Spinner className="py-32" />
@@ -519,7 +813,8 @@ export function SettingsPage() {
               <h2 className="section-title">Vị trí lưu trữ dữ liệu</h2>
             </div>
             <p className="mt-1 text-[11.5px] muted">
-              Toàn bộ dữ liệu được lưu cục bộ trên máy tính của bạn, không gửi lên máy chủ.
+              Dữ liệu được lưu cục bộ trên máy tính. Chỉ khi bạn bật sao lưu Google Drive, bản
+              snapshot mới được tải lên tài khoản Drive của bạn.
             </p>
             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/30">
               <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
@@ -559,7 +854,7 @@ export function SettingsPage() {
                 <Button
                   leftIcon={<Download className="h-4 w-4" />}
                   loading={busyAction === 'backup'}
-                  onClick={() => void backup()}
+                  onClick={() => void backupToFile()}
                 >
                   Sao lưu ngay
                 </Button>
@@ -593,7 +888,7 @@ export function SettingsPage() {
                     size="sm"
                     variant="outline"
                     leftIcon={<Download className="h-3.5 w-3.5" />}
-                    onClick={() => void backup()}
+                    onClick={() => void backupToFile()}
                     loading={busyAction === 'backup'}
                     disabled={!canBackup || busyAction !== null}
                   >
@@ -649,6 +944,459 @@ export function SettingsPage() {
                 >
                   Xóa dữ liệu nghiệp vụ
                 </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 xl:col-span-2">
+            <div className="card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <FolderSync className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+                  <h2 className="section-title">Sao lưu tự động</h2>
+                </div>
+                <Badge tone={backup?.config.autoBackupEnabled ? 'success' : 'neutral'} dot>
+                  {backup?.config.autoBackupEnabled ? 'Đang bật' : 'Đang tắt'}
+                </Badge>
+              </div>
+              <p className="mt-1 text-[11.5px] muted">
+                Tự động tạo bản snapshot khi đóng ứng dụng và mỗi ngày một lần khi ứng dụng đang mở. Bản
+                snapshot dùng <code className="font-mono text-[11px]">VACUUM INTO</code> nên an toàn với
+                cơ sở dữ liệu đang chạy.
+              </p>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="space-y-4">
+                  <Switch
+                    checked={backupDraft?.autoBackupEnabled ?? false}
+                    onChange={(checked) => updateBackup('autoBackupEnabled', checked)}
+                    disabled={!canWrite || backupBusy}
+                    label="Bật sao lưu tự động"
+                    description="Khi đóng app và mỗi 24 giờ nếu app đang mở."
+                  />
+
+                  <Field
+                    label="Thư mục sao lưu"
+                    hint="Có thể chọn thư mục Google Drive for desktop (ví dụ G:\My Drive\Manager Device) hoặc thư mục bất kỳ."
+                  >
+                    <div className="flex min-w-0 gap-2">
+                      <Input
+                        readOnly
+                        value={backupDraft?.backupFolder ?? ''}
+                        placeholder="Chưa chọn thư mục sao lưu"
+                        className="font-mono text-[11.5px]"
+                      />
+                      <Button
+                        variant="outline"
+                        leftIcon={<FolderOpen className="h-3.5 w-3.5" />}
+                        onClick={() => void chooseFolder()}
+                        loading={busyAction === 'folder-choose'}
+                        disabled={!canWrite || backupBusy}
+                      >
+                        Chọn
+                      </Button>
+                    </div>
+                  </Field>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field
+                      label="Số bản sao lưu giữ lại"
+                      hint="Bản cũ nhất sẽ tự động bị xóa."
+                      htmlFor="backup-retention"
+                    >
+                      <Input
+                        id="backup-retention"
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={backupDraft?.retention ?? 7}
+                        disabled={!canWrite || backupBusy}
+                        onChange={(event) =>
+                          updateBackup('retention', Math.max(1, Number(event.target.value) || 1))
+                        }
+                      />
+                    </Field>
+                    <div className="flex items-end pb-1">
+                      <Switch
+                        checked={backupDraft?.driveBackupEnabled ?? false}
+                        onChange={(checked) => updateBackup('driveBackupEnabled', checked)}
+                        disabled={!canWrite || backupBusy || !driveStatus?.connected}
+                        label="Kèm Google Drive"
+                        description={
+                          driveStatus?.connected
+                            ? 'Tải bản snapshot lên Drive khi sao lưu tự động.'
+                            : 'Kết nối Google Drive bên dưới để bật.'
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      leftIcon={<Save className="h-3.5 w-3.5" />}
+                      onClick={() => void saveBackupConfig()}
+                      loading={busyAction === 'backup-config'}
+                      disabled={!canWrite || !backupDirty || backupBusy}
+                    >
+                      Lưu thiết lập
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      leftIcon={<Download className="h-3.5 w-3.5" />}
+                      onClick={() => void folderBackup()}
+                      loading={busyAction === 'folder-backup'}
+                      disabled={!canBackup || !backup?.config.backupFolder || backupBusy}
+                    >
+                      Sao lưu ngay
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+                      onClick={() => void refreshFolderBackups()}
+                      disabled={backupBusy}
+                    >
+                      Làm mới
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 dark:border-slate-700 dark:bg-slate-800/30">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
+                      Lần sao lưu gần nhất
+                    </p>
+                    <Badge tone={lastStatusTone} dot>
+                      {backup?.state.lastBackupStatus === 'success'
+                        ? 'Thành công'
+                        : backup?.state.lastBackupStatus === 'failed'
+                          ? 'Thất bại'
+                          : 'Chưa có'}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-[13px] font-semibold text-slate-800 dark:text-slate-100">
+                    {backup?.state.lastBackupAt ? formatDateTime(backup.state.lastBackupAt) : 'Chưa sao lưu'}
+                  </p>
+                  <div className="mt-1.5 space-y-1 text-[11.5px] text-slate-500 dark:text-slate-400">
+                    <p>
+                      Đích:{' '}
+                      <span className="font-medium text-slate-700 dark:text-slate-200">
+                        {backup?.state.lastBackupTarget
+                          ? (BACKUP_TARGET_LABELS[backup.state.lastBackupTarget] ??
+                            backup.state.lastBackupTarget)
+                          : '—'}
+                      </span>
+                    </p>
+                    <p className="break-all">
+                      Tệp:{' '}
+                      <span className="font-mono text-[11px] text-slate-700 dark:text-slate-200">
+                        {backup?.state.lastBackupFile ?? '—'}
+                      </span>
+                    </p>
+                    {backup?.lastAutoBackupAt && (
+                      <p>Tự động gần nhất: {formatDateTime(backup.lastAutoBackupAt)}</p>
+                    )}
+                  </div>
+                  {backup?.state.lastBackupMessage && (
+                    <p
+                      className={cn(
+                        'mt-2 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed',
+                        backup.state.lastBackupStatus === 'failed'
+                          ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'
+                          : 'bg-white text-slate-500 dark:bg-slate-900/50 dark:text-slate-400'
+                      )}
+                    >
+                      {backup.state.lastBackupMessage}
+                    </p>
+                  )}
+                  {autoNeedsTarget && (
+                    <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                      Sao lưu tự động đang bật nhưng chưa có đích. Hãy chọn thư mục hoặc kết nối Google
+                      Drive.
+                    </p>
+                  )}
+                  {backup?.config.backupFolder && !backup.folderAvailable && (
+                    <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                      Không truy cập được thư mục sao lưu. Nếu đây là thư mục Google Drive, hãy kiểm tra
+                      Google Drive for desktop đang chạy.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+                    Bản sao lưu trong thư mục ({formatNumber(folderBackups.length)})
+                  </p>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => void refreshFolderBackups()}
+                    disabled={backupBusy || !backup?.config.backupFolder}
+                    aria-label="Làm mới danh sách bản sao lưu"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                {!backup?.config.backupFolder ? (
+                  <p className="mt-2 text-[11.5px] text-slate-400">
+                    Chọn thư mục sao lưu để xem danh sách bản sao lưu tại đây.
+                  </p>
+                ) : folderBackups.length === 0 ? (
+                  <p className="mt-2 text-[11.5px] text-slate-400">
+                    Chưa có bản sao lưu nào trong thư mục này.
+                  </p>
+                ) : (
+                  <div className="mt-2 max-h-64 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                    {folderBackups.map((entry) => (
+                      <div
+                        key={entry.name}
+                        className="flex flex-col gap-2 border-b border-slate-100 px-3 py-2.5 last:border-b-0 sm:flex-row sm:items-center dark:border-slate-800"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="break-all font-mono text-[11.5px] font-medium text-slate-800 dark:text-slate-100">
+                            {entry.name}
+                          </p>
+                          <p className="mt-0.5 text-[10.5px] text-slate-400">
+                            {formatDateTime(entry.createdAt)} · {formatBytes(entry.size)}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          leftIcon={<RotateCcw className="h-3 w-3" />}
+                          onClick={() => void restoreFolder(entry)}
+                          loading={busyAction === 'folder-restore'}
+                          disabled={!canWrite || backupBusy}
+                        >
+                          Phục hồi
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Cloud className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                  <h2 className="section-title">Google Drive trực tiếp</h2>
+                </div>
+                <Badge
+                  tone={driveStatus?.connected ? 'success' : driveStatus?.configured ? 'warning' : 'neutral'}
+                  dot
+                >
+                  {driveStatus?.connected
+                    ? 'Đã kết nối'
+                    : driveStatus?.configured
+                      ? 'Chưa kết nối'
+                      : 'Chưa cấu hình'}
+                </Badge>
+              </div>
+              <p className="mt-1 text-[11.5px] muted">
+                Kết nối trực tiếp bằng Google Drive API để tải bản sao lưu lên Drive mà không cần cài
+                Google Drive for desktop. Ứng dụng chỉ có quyền với các tệp do chính nó tạo ra
+                (<code className="font-mono text-[10.5px]">drive.file</code>).
+              </p>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div className="space-y-3">
+                  <Field
+                    label="OAuth Client ID"
+                    hint="Tạo OAuth client loại Desktop app trong Google Cloud Console."
+                    htmlFor="drive-client-id"
+                  >
+                    <Input
+                      id="drive-client-id"
+                      value={driveForm.clientId}
+                      disabled={!canWrite || backupBusy}
+                      placeholder="xxxxxxxx.apps.googleusercontent.com"
+                      className="font-mono text-[11.5px]"
+                      onChange={(event) =>
+                        setDriveForm((prev) => ({ ...prev, clientId: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field
+                    label="OAuth Client Secret"
+                    hint={
+                      driveStatus?.secretConfigured
+                        ? 'Client Secret đã được lưu. Để trống nếu không thay đổi.'
+                        : 'Client Secret được lưu cục bộ và mã hóa bằng Windows safeStorage khi có thể.'
+                    }
+                    htmlFor="drive-client-secret"
+                  >
+                    <Input
+                      id="drive-client-secret"
+                      type="password"
+                      value={driveForm.clientSecret}
+                      disabled={!canWrite || backupBusy}
+                      placeholder={driveStatus?.secretConfigured ? '•••••••••••• (đã lưu)' : 'Client Secret'}
+                      autoComplete="off"
+                      onChange={(event) =>
+                        setDriveForm((prev) => ({ ...prev, clientSecret: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      leftIcon={<Save className="h-3.5 w-3.5" />}
+                      onClick={() => void saveDriveConfig()}
+                      loading={busyAction === 'drive-save'}
+                      disabled={!canWrite || backupBusy}
+                    >
+                      Lưu cấu hình
+                    </Button>
+                    <Button
+                      size="sm"
+                      leftIcon={<Link2 className="h-3.5 w-3.5" />}
+                      onClick={() => void connectDrive()}
+                      loading={busyAction === 'drive-connect'}
+                      disabled={!canWrite || backupBusy}
+                    >
+                      {driveStatus?.connected ? 'Kết nối lại' : 'Kết nối Google Drive'}
+                    </Button>
+                    {driveStatus?.connected && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        leftIcon={<LogOut className="h-3.5 w-3.5" />}
+                        onClick={() => void disconnectDrive()}
+                        loading={busyAction === 'drive-disconnect'}
+                        disabled={!canWrite || backupBusy}
+                      >
+                        Ngắt kết nối
+                      </Button>
+                    )}
+                  </div>
+                  <details className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/30">
+                    <summary className="cursor-pointer text-[11.5px] font-semibold text-slate-700 dark:text-slate-200">
+                      Hướng dẫn tạo OAuth Client
+                    </summary>
+                    <ol className="mt-2 list-inside list-decimal space-y-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                      <li>Mở Google Cloud Console, tạo hoặc chọn một project.</li>
+                      <li>Bật Google Drive API trong mục APIs &amp; Services.</li>
+                      <li>Cấu hình OAuth consent screen (Internal hoặc External).</li>
+                      <li>
+                        Vào Credentials → Create credentials → OAuth client ID → chọn Desktop app.
+                      </li>
+                      <li>Dán Client ID và Client Secret vào ô bên trên rồi bấm Kết nối.</li>
+                    </ol>
+                  </details>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 dark:border-slate-700 dark:bg-slate-800/30">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
+                        Trạng thái Drive
+                      </p>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={() => void refreshDriveBackups()}
+                        disabled={!driveStatus?.connected || backupBusy}
+                        aria-label="Làm mới danh sách Google Drive"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <p className="mt-1.5 break-all text-[12.5px] font-medium text-slate-800 dark:text-slate-100">
+                      {driveStatus?.accountEmail ?? 'Chưa có tài khoản Google'}
+                    </p>
+                    <div className="mt-1.5 space-y-1 text-[11.5px] text-slate-500 dark:text-slate-400">
+                      <p>Đồng bộ gần nhất: {driveStatus?.lastSyncAt ? formatDateTime(driveStatus.lastSyncAt) : '—'}</p>
+                      <p className="break-all">
+                        Thư mục Drive:{' '}
+                        <span className="font-mono text-[10.5px]">
+                          {driveStatus?.folderId ?? 'Manager Device Backups (tự tạo)'}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        leftIcon={<CloudUpload className="h-3.5 w-3.5" />}
+                        onClick={() => void driveBackup()}
+                        loading={busyAction === 'drive-backup'}
+                        disabled={!canBackup || !driveStatus?.connected || backupBusy}
+                      >
+                        Sao lưu lên Drive
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        leftIcon={<CloudDownload className="h-3.5 w-3.5" />}
+                        onClick={() => void refreshDriveBackups()}
+                        disabled={!driveStatus?.connected || backupBusy}
+                      >
+                        Danh sách
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+                      Bản sao lưu trên Google Drive ({formatNumber(driveBackups.length)})
+                    </p>
+                    {!driveStatus?.connected ? (
+                      <p className="mt-1.5 text-[11.5px] text-slate-400">
+                        Kết nối Google Drive để xem và phục hồi bản sao lưu trực tuyến.
+                      </p>
+                    ) : driveBackups.length === 0 ? (
+                      <p className="mt-1.5 text-[11.5px] text-slate-400">
+                        Chưa có bản sao lưu nào trên Google Drive.
+                      </p>
+                    ) : (
+                      <div className="mt-2 max-h-64 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                        {driveBackups.map((entry) => (
+                          <div
+                            key={entry.id ?? entry.name}
+                            className="flex flex-col gap-2 border-b border-slate-100 px-3 py-2.5 last:border-b-0 sm:flex-row sm:items-center dark:border-slate-800"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="break-all font-mono text-[11.5px] font-medium text-slate-800 dark:text-slate-100">
+                                {entry.name}
+                              </p>
+                              <p className="mt-0.5 text-[10.5px] text-slate-400">
+                                {formatDateTime(entry.createdAt)} · {formatBytes(entry.size)}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                leftIcon={<RotateCcw className="h-3 w-3" />}
+                                onClick={() => void restoreDrive(entry)}
+                                loading={busyAction === 'drive-restore'}
+                                disabled={!canWrite || backupBusy}
+                              >
+                                Phục hồi
+                              </Button>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => void removeDrive(entry)}
+                                loading={busyAction === 'drive-remove'}
+                                disabled={!canBackup || backupBusy}
+                                aria-label={`Xóa ${entry.name}`}
+                              >
+                                <Trash2 className="h-3 w-3 text-rose-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -721,7 +1469,7 @@ export function SettingsPage() {
               <ul className="list-inside list-disc space-y-1">
                 <li>Mật khẩu được băm bằng bcrypt, không lưu dạng văn bản.</li>
                 <li>Mọi thao tác đều được kiểm tra quyền ở tiến trình chính.</li>
-                <li>Dữ liệu không rời khỏi máy tính của bạn.</li>
+                <li>Dữ liệu chỉ rời máy khi bạn chủ động bật sao lưu Google Drive.</li>
                 <li>Nên sao lưu định kỳ và cất giữ tệp sao lưu ở nơi an toàn.</li>
               </ul>
             </div>
