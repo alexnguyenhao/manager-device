@@ -130,6 +130,9 @@ const api: WindowApi = {
   },
   app: {
     info: () => invoke('app:info')
+  },
+  hardware: {
+    scan: () => invoke('hardware:scan')
   }
 }
 

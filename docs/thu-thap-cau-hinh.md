@@ -2,6 +2,8 @@
 
 Có 3 cách, từ nhanh nhất đến đầy đủ nhất.
 
+> **Khuyến nghị khi Smart App Control đang bật:** dùng **Thiết bị → Quét máy này** ngay trong Manager Device. Ứng dụng chạy script qua `powershell.exe` có sẵn trong bộ nhớ, không tạo tệp `.bat`/`.ps1` nên không bị chặn với lỗi *“dangerous file extension”*. Các cách bên dưới chỉ dùng khi máy đích không cài Manager Device và chính sách bảo mật cho phép chạy script.
+
 ---
 
 ## Cách 1 — Chạy script tự động (khuyến nghị)

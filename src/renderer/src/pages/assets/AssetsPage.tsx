@@ -13,6 +13,7 @@ import {
   Plus,
   Printer,
   QrCode,
+  ScanLine,
   ShieldAlert,
   Tag,
   Trash2,
@@ -113,6 +114,7 @@ export function AssetsPage() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [autoScan, setAutoScan] = useState(false)
   const [labelAssets, setLabelAssets] = useState<Asset[]>([])
   const [labelOpen, setLabelOpen] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -237,11 +239,19 @@ export function AssetsPage() {
 
   const openCreate = (): void => {
     setEditingId(null)
+    setAutoScan(false)
+    setFormOpen(true)
+  }
+
+  const openScanner = (): void => {
+    setEditingId(null)
+    setAutoScan(true)
     setFormOpen(true)
   }
 
   const openEdit = (asset: Asset): void => {
     setEditingId(asset.id)
+    setAutoScan(false)
     setFormOpen(true)
   }
 
@@ -402,9 +412,18 @@ export function AssetsPage() {
               )}
             </Dropdown>
             {canWrite && (
-              <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
-                Thêm thiết bị
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  leftIcon={<ScanLine className="h-4 w-4" />}
+                  onClick={openScanner}
+                >
+                  Quét máy này
+                </Button>
+                <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
+                  Thêm thiết bị
+                </Button>
+              </>
             )}
           </>
         }
@@ -820,7 +839,11 @@ export function AssetsPage() {
         locations={locations}
         employees={employees}
         suppliers={suppliers}
-        onClose={() => setFormOpen(false)}
+        autoScan={autoScan}
+        onClose={() => {
+          setFormOpen(false)
+          setAutoScan(false)
+        }}
         onSaved={() => {
           void load()
           void loadCatalogs()

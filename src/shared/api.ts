@@ -50,7 +50,8 @@ import type {
   UserAccount,
   UserInput,
   ActivityLog,
-  AssetStatus
+  AssetStatus,
+  HardwareScanResult
 } from './types'
 
 export type AssetExportParams = AssetListParams
@@ -167,5 +168,8 @@ export interface WindowApi {
   }
   app: {
     info: () => Promise<AppInfo>
+  }
+  hardware: {
+    scan: () => Promise<HardwareScanResult>
   }
 }

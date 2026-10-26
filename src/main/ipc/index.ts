@@ -111,6 +111,7 @@ import {
   updateUser
 } from '../services/user.service'
 import { listLogs } from '../services/log-list.service'
+import { scanHardware } from '../services/hardware.service'
 import {
   deleteAttachment,
   openAttachment,
@@ -512,6 +513,9 @@ export function registerIpcHandlers(): void {
     permission: 'settings:write'
   })
   handle('app:info', () => getAppInfo())
+
+  /* ------------------------------- Hardware ------------------------------ */
+  handle('hardware:scan', () => scanHardware(), { permission: 'asset:write' })
 
   /* -------------------------------- Backup ------------------------------- */
   handle('backup:overview', () => getBackupOverview())

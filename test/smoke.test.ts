@@ -34,6 +34,7 @@ async function main(): Promise<void> {
     '../src/main/services/excel.service'
   )
   const { findSpecPreset, getEffectiveSpecFields } = await import('../src/shared/spec-presets')
+  const { parseHardwareOutput } = await import('../src/main/services/hardware.service')
 
   openDatabase()
   const db = getDb()
@@ -63,6 +64,79 @@ async function main(): Promise<void> {
   if (customFields.length !== 1 || customFields[0].key !== 'custom') {
     throw new Error('Custom spec schema should take precedence over preset')
   }
+
+  const laptopScan = parseHardwareOutput(
+    `noise line\nMD_HARDWARE_SCAN:${Buffer.from(
+      JSON.stringify({
+        computerName: 'PC-LANH-DAO',
+        isLaptop: true,
+        manufacturer: 'Dell Inc.',
+        model: 'Latitude 5450',
+        serialNumber: 'ABC1234',
+        cpu: 'Intel Core i5-1335U',
+        cpuCores: 10,
+        cpuThreads: 12,
+        ramGB: 16,
+        ramType: 'DDR5',
+        ramBus: 4800,
+        ramSlots: 'DIMM A 8GB, DIMM B 8GB',
+        storage: 'SSD NVMe 512GB',
+        gpu: 'Intel Iris Xe Graphics',
+        gpuMemory: 'Chia sẻ',
+        monitor: 'BOE 0x095F',
+        screenSize: 14,
+        os: 'Windows 11 Pro',
+        osCaption: 'Microsoft Windows 11 Pro',
+        osVersion: '10.0.22631',
+        osBuild: '22631',
+        osLicense: 'licensed',
+        ipAddresses: '10.0.0.25'
+      })
+    ).toString('base64')}\n`
+  )
+  if (laptopScan.deviceType !== 'laptop') throw new Error('Hardware laptop detection failed')
+  if (laptopScan.suggestedCategory !== 'Laptop') throw new Error('Hardware category failed')
+  if (laptopScan.name !== 'Dell Inc. Latitude 5450') throw new Error('Hardware name failed')
+  if (laptopScan.os !== 'Windows 11 Pro' || laptopScan.osLicense !== 'Có bản quyền') {
+    throw new Error('Hardware OS mapping failed')
+  }
+  if (laptopScan.specs.screen !== 14 || laptopScan.specs.ram !== 16) {
+    throw new Error('Hardware laptop specs failed')
+  }
+  if ('monitor' in laptopScan.specs) throw new Error('Laptop should not include monitor spec')
+  if (!laptopScan.note.includes('10.0.0.25')) throw new Error('Hardware note failed')
+
+  const desktopScan = parseHardwareOutput(
+    `MD_HARDWARE_SCAN:${Buffer.from(
+      JSON.stringify({
+        computerName: 'PC-TEST',
+        isLaptop: false,
+        manufacturer: '',
+        model: '',
+        cpu: 'Intel Core i5-9400',
+        cpuCores: 6,
+        cpuThreads: 6,
+        ramGB: 32,
+        ramType: 'DDR2',
+        ramBus: 2133,
+        storage: 'SSD NVMe 500GB',
+        gpu: 'NVIDIA GeForce RTX 3060',
+        gpuMemory: '12GB',
+        monitor: 'Dell E228WFP',
+        os: 'Windows 11 Home',
+        osLicense: 'unlicensed',
+        ipAddresses: '192.168.1.10'
+      })
+    ).toString('base64')}\n`
+  )
+  if (desktopScan.deviceType !== 'desktop') throw new Error('Hardware desktop detection failed')
+  if (desktopScan.specs.monitor !== 'Dell E228WFP') {
+    throw new Error('Hardware desktop monitor spec failed')
+  }
+  if ('ramType' in desktopScan.specs) {
+    throw new Error('Unsupported RAM type should not be filled into specs')
+  }
+  if (desktopScan.osLicense !== 'Không') throw new Error('Hardware license mapping failed')
 
   const assetCount = Number(
     (db.prepare('SELECT COUNT(*) AS count FROM assets').get() as { count: number }).count

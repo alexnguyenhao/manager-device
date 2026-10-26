@@ -24,6 +24,7 @@ Có thể thêm, sửa hoặc ngừng sử dụng phòng ban tại **Cơ cấu t
 
 - **Bảng điều khiển** — KPI tài sản, giá trị còn lại, cảnh báo bảo hành/bảo trì, cơ cấu tài sản theo Khối Đảng/Khối Nhà nước, biểu đồ phân bố và hoạt động gần đây.
 - **Quản lý thiết bị** — Danh sách, tìm kiếm không phân biệt dấu (kể cả cấu hình CPU/RAM/ổ cứng), lọc theo khối/phòng ban, sắp xếp, thêm/sửa/xóa, nhập và xuất Excel.
+- **Quét cấu hình máy** — Nút **Quét máy này** đọc CPU, RAM, ổ cứng, GPU, màn hình, Windows, serial và tự điền biểu mẫu PC/Laptop; chạy qua PowerShell có sẵn nên không bị Smart App Control chặn.
 - **Hồ sơ thiết bị** — Cấu hình chi tiết theo danh mục (CPU, RAM, GPU, dung lượng ổ cứng, hệ điều hành/Windows…), khấu hao, bảo hành, tệp đính kèm, lịch sử cấp phát/bảo trì/nhật ký.
 - **Cấp phát & thu hồi** — Bàn giao thiết bị cho cán bộ, công chức, theo dõi hạn trả, tình trạng trước/sau khi thu hồi.
 - **Bảo trì & sửa chữa** — Lập lịch, theo dõi tiến độ, chi phí, nhà cung cấp và lịch sử bảo dưỡng.
@@ -70,7 +71,7 @@ Bộ cài Windows (.exe) và AppImage Linux được tạo tự động bởi Gi
 
 **https://github.com/alexnguyenhao/manager-device/releases/latest**
 
-Tải `ManagerDevice-Setup-1.0.2.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng. File Excel mẫu nhập thiết bị cũng được đính kèm trong mục **Assets** của bản phát hành.
+Tải `ManagerDevice-Setup-1.0.4.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng. File Excel mẫu nhập thiết bị cũng được đính kèm trong mục **Assets** của bản phát hành.
 
 ---
 
@@ -93,7 +94,7 @@ npm run build
 npm run build:win
 ```
 
-Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `ManagerDevice-Setup-1.0.0.exe`.
+Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `ManagerDevice-Setup-1.0.4.exe`.
 
 > Nếu mạng npm không ổn định, có thể chạy `npm install --prefer-offline` hoặc cấu hình registry nội bộ. Không cần tải binary Electron riêng — npm sẽ tự tải khi cài đặt bình thường.
 
@@ -101,7 +102,21 @@ Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `Man
 
 ## Thu thập cấu hình nhanh
 
-Chạy **`tools/ThuThapCauHinh.bat`** trên máy Windows cần kiểm tra. Script tự đọc cấu hình và xuất:
+### Quét ngay trong Manager Device (khuyến nghị)
+
+Mở **Thiết bị** → **Quét máy này** (hoặc nút **Quét máy này** trong biểu mẫu thêm thiết bị). Ứng dụng sẽ:
+
+- Đọc CPU + số nhân/số luồng, RAM + loại RAM + bus, ổ cứng, GPU + bộ nhớ, màn hình/kích thước màn hình, hệ điều hành, bản quyền Windows, serial, hãng/model và địa chỉ IP.
+- Tự chọn danh mục **Máy tính để bàn** hoặc **Laptop**, tự sinh mã thiết bị và điền sẵn các trường cấu hình đúng khóa `specs` của ứng dụng.
+- Hiển thị bảng tóm tắt kiểu CPU-Z ngay trong biểu mẫu để đối chiếu trước khi lưu. Có thể bấm **Quét lại** nếu vừa thay đổi phần cứng.
+
+Cách hoạt động này **không tạo tệp `.bat`/`.ps1`**. Ứng dụng gọi `powershell.exe` có sẵn của Windows và gửi script qua standard input, nên không bị **Smart App Control** chặn với lỗi *“blocked an app with a dangerous file extension”*. Không cần quyền Administrator và không gửi dữ liệu ra ngoài.
+
+> Máy cần quét phải đang chạy Manager Device. Nếu chỉ muốn thu thập cấu hình từ xa mà không cài ứng dụng, xem mục **Công cụ CSV dự phòng** bên dưới.
+
+### Công cụ CSV dự phòng
+
+Chỉ dùng khi máy đích không cài Manager Device và chính sách bảo mật cho phép chạy script. Chạy **`tools/ThuThapCauHinh.bat`** trên máy Windows cần kiểm tra. Script tự đọc cấu hình và xuất:
 
 - **CSV** nhập thẳng vào phần mềm (Thiết bị → Nhập Excel).
 - **TXT** báo cáo chi tiết để đọc/đối chiếu.
@@ -110,11 +125,14 @@ Nội dung thu thập: hãng, model, serial, CPU + số nhân/số luồng, RAM 
 
 Không cần Administrator, không gửi dữ liệu ra ngoài. Xem hướng dẫn và các lệnh kiểm tra nhanh tại **`docs/thu-thap-cau-hinh.md`**.
 
-### Gửi công cụ sang máy người khác
+> Nếu Smart App Control đang bật và chặn `.bat`, hãy dùng nút **Quét máy này** trong ứng dụng thay vì cố chạy công cụ CSV. Không nên tắt Smart App Control chỉ để chạy công cụ.
+
+### Gửi công cụ CSV sang máy người khác
 
 - **Chỉ 1 file:** gửi **`TaiVaChay.bat`** — [tải tại đây](https://github.com/alexnguyenhao/manager-device/releases/latest/download/TaiVaChay.bat). File tự tải bộ công cụ mới nhất rồi chạy (máy đích cần Internet lần đầu).
 - **Chép cả thư mục:** tải [ZIP công cụ](https://github.com/alexnguyenhao/manager-device/releases/latest/download/ManagerDevice-CongCu-ThuThap-CauHinh.zip), giải nén, chép cả thư mục `ManagerDevice-CongCu` sang máy đích rồi chạy `ThuThapCauHinh.bat`.
 - Nếu Windows chặn file tải về: chuột phải → **Properties** → tích **Unblock** → **OK**.
+- Nếu Smart App Control chặn file `.bat`: dùng **Quét máy này** trong Manager Device trên máy đích, hoặc liên hệ quản trị viên để được cấp quyền chạy công cụ.
 
 ---
 
@@ -265,7 +283,8 @@ managerDevice/
 | `npm run build:linux` | Build AppImage cho Linux |
 | `npm run seed:catalogs` | Bổ sung danh mục thiết bị mặc định (bỏ qua danh mục đã có) |
 | `npm run template:excel` | Tạo file Excel mẫu nhập thiết bị từ dữ liệu danh mục hiện có |
-| `tools/ThuThapCauHinh.bat` | Quét cấu hình PC/Laptop/Máy in và xuất CSV nhập vào phần mềm |
+| **Thiết bị → Quét máy này** | Quét cấu hình PC/Laptop hiện tại và tự điền biểu mẫu (không dùng file `.bat`) |
+| `tools/ThuThapCauHinh.bat` | Công cụ CSV dự phòng: quét cấu hình PC/Laptop/Máy in và xuất CSV nhập vào phần mềm |
 | `npm run reset:data` | Xóa dữ liệu nghiệp vụ, giữ lại tài khoản |
 
 ---
@@ -293,4 +312,4 @@ managerDevice/
 
 ---
 
-© 2026 Manager Device · Phiên bản 1.0.2
+© 2026 Manager Device · Phiên bản 1.0.4

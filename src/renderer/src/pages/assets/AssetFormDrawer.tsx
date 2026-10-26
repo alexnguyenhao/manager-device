@@ -4,9 +4,17 @@ import {
   Boxes,
   CircleAlert,
   Cpu,
+  HardDrive,
+  Laptop,
   MapPin,
+  MemoryStick,
+  Monitor,
+  Network,
+  PcCase,
   RefreshCw,
   Save,
+  ScanLine,
+  ShieldCheck,
   ShoppingCart,
   Sparkles,
   UserRound,
@@ -20,6 +28,7 @@ import type {
   Category,
   Department,
   Employee,
+  HardwareScanResult,
   Location,
   Supplier
 } from '@shared/types'
@@ -38,6 +47,7 @@ import {
   addMonths,
   computeDepreciation,
   formatCurrency,
+  formatDateTime,
   todayISO
 } from '@shared/utils'
 import { api, errorMessage } from '../../lib/api'
@@ -57,6 +67,8 @@ interface AssetFormDrawerProps {
   suppliers: Supplier[]
   onClose: () => void
   onSaved: (asset: Asset) => void
+  /** Tự động quét cấu hình khi mở biểu mẫu tạo mới. */
+  autoScan?: boolean
 }
 
 interface FormState {
@@ -157,6 +169,30 @@ function SectionTitle({
   )
 }
 
+function ScanRow({
+  icon,
+  label,
+  value
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="break-words text-[12px] font-medium leading-snug text-slate-700 dark:text-slate-200">
+          {value || '—'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function AssetFormDrawer({
   open,
   assetId,
@@ -166,29 +202,41 @@ export function AssetFormDrawer({
   employees,
   suppliers,
   onClose,
-  onSaved
+  onSaved,
+  autoScan = false
 }: AssetFormDrawerProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [codeLoading, setCodeLoading] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [scanResult, setScanResult] = useState<HardwareScanResult | null>(null)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [scanWarning, setScanWarning] = useState<string | null>(null)
   const codeTouched = useRef(false)
   const loadedId = useRef<number | null>(null)
+  const autoScanStarted = useRef(false)
+  const scanningRef = useRef(false)
 
   useEffect(() => {
     if (!open) {
       loadedId.current = null
+      autoScanStarted.current = false
       return
     }
     setError(null)
+    setScanError(null)
+    setScanWarning(null)
     codeTouched.current = Boolean(assetId)
     if (!assetId) {
       setForm(EMPTY_FORM)
+      setScanResult(null)
       return
     }
     if (loadedId.current === assetId) return
     loadedId.current = assetId
+    setScanResult(null)
     setLoading(true)
     api.assets
       .get(assetId)
@@ -206,6 +254,7 @@ export function AssetFormDrawer({
     Boolean(selectedCategory) &&
     Boolean(selectedPreset) &&
     (selectedCategory?.specSchema.length ?? 0) === 0
+  const showScanner = !assetId || Boolean(computerPreset)
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]): void => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -235,6 +284,91 @@ export function AssetFormDrawer({
       }
     }
   }
+
+  const pickComputerCategory = (result: HardwareScanResult): Category | undefined => {
+    const presetId = result.deviceType === 'laptop' ? 'laptop' : 'pc'
+    const candidates = categories.filter(
+      (category) => category.isActive && findSpecPreset(category)?.id === presetId
+    )
+    const suggested = result.suggestedCategory.trim().toLowerCase()
+    return (
+      candidates.find((category) => category.name.trim().toLowerCase() === suggested) ??
+      candidates[0]
+    )
+  }
+
+  const runScan = async (): Promise<void> => {
+    if (scanningRef.current) return
+    scanningRef.current = true
+    setScanning(true)
+    setScanError(null)
+    setScanWarning(null)
+    try {
+      const result = await api.hardware.scan()
+      setScanResult(result)
+      const category = pickComputerCategory(result)
+
+      setForm((prev) => {
+        const next: FormState = { ...prev, specs: { ...prev.specs } }
+        if (category) {
+          next.categoryId = String(category.id)
+          if (!assetId) {
+            next.warrantyMonths = String(category.defaultWarrantyMonths || '')
+            next.depreciationMonths = String(category.defaultDepreciationMonths || '')
+          }
+        }
+        if (!next.name.trim()) next.name = result.name
+        if (!next.serialNumber.trim()) next.serialNumber = result.serialNumber
+        if (!next.model.trim()) next.model = result.model
+        if (!next.manufacturer.trim()) next.manufacturer = result.manufacturer
+        for (const [key, value] of Object.entries(result.specs)) {
+          next.specs[key] = String(value)
+        }
+        if (!next.note.trim()) next.note = result.note
+        return next
+      })
+
+      if (!category) {
+        setScanWarning(
+          'Chưa có danh mục Máy tính để bàn hoặc Laptop đang hoạt động. Hãy tạo danh mục phù hợp để lưu cấu hình.'
+        )
+      } else if (!assetId && !codeTouched.current) {
+        setCodeLoading(true)
+        try {
+          const code = await api.assets.nextCode(category.id)
+          setForm((prev) =>
+            prev.categoryId === String(category.id) ? { ...prev, code } : prev
+          )
+        } catch {
+          // Người dùng vẫn có thể tự nhập mã.
+        } finally {
+          setCodeLoading(false)
+        }
+      }
+
+      toast.success(
+        'Đã quét cấu hình máy',
+        `${result.computerName} · ${result.deviceType === 'laptop' ? 'Laptop' : 'Máy tính để bàn'}`
+      )
+    } catch (err) {
+      const message = errorMessage(err)
+      setScanError(message)
+      toast.error('Không quét được cấu hình', message)
+    } finally {
+      scanningRef.current = false
+      setScanning(false)
+    }
+  }
+
+  const runScanRef = useRef(runScan)
+  runScanRef.current = runScan
+
+  useEffect(() => {
+    if (!open || !autoScan || assetId) return
+    if (autoScanStarted.current) return
+    autoScanStarted.current = true
+    void runScanRef.current()
+  }, [open, autoScan, assetId])
 
   const onEmployeeChange = (value: string): void => {
     const employee = employees.find((e) => String(e.id) === value)
@@ -374,6 +508,144 @@ export function AssetFormDrawer({
         <Spinner className="py-20" />
       ) : (
         <div className="space-y-6">
+          {showScanner && (
+            <section className="overflow-hidden rounded-2xl border border-brand-200/80 bg-gradient-to-br from-brand-50/90 via-white to-slate-50 shadow-sm dark:border-brand-500/20 dark:from-brand-500/10 dark:via-slate-900 dark:to-slate-900">
+              <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 shadow-sm ring-1 ring-brand-100 dark:bg-slate-800 dark:text-brand-300 dark:ring-brand-500/20">
+                  <ScanLine className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100">
+                    Quét cấu hình máy này
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500 dark:text-slate-400">
+                    Đọc CPU, RAM, ổ cứng, GPU, màn hình, Windows và serial rồi tự điền vào biểu
+                    mẫu. Chạy bằng PowerShell có sẵn của Windows, không cần Administrator và
+                    không tạo tệp .bat/.ps1.
+                  </p>
+                </div>
+                <Button
+                  variant={scanResult ? 'outline' : 'primary'}
+                  size="sm"
+                  loading={scanning}
+                  leftIcon={!scanning ? <ScanLine className="h-3.5 w-3.5" /> : undefined}
+                  onClick={() => void runScan()}
+                >
+                  {scanning ? 'Đang quét…' : scanResult ? 'Quét lại' : 'Quét máy này'}
+                </Button>
+              </div>
+
+              {scanError && (
+                <div className="flex items-start gap-2 border-t border-rose-100 bg-rose-50/80 px-4 py-2.5 text-[11.5px] font-medium text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Không quét được cấu hình: {scanError} Bạn vẫn có thể nhập tay hoặc thử quét
+                    lại.
+                  </span>
+                </div>
+              )}
+
+              {scanWarning && (
+                <div className="flex items-start gap-2 border-t border-amber-100 bg-amber-50/80 px-4 py-2.5 text-[11.5px] font-medium text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{scanWarning}</span>
+                </div>
+              )}
+
+              {scanResult && (
+                <div className="border-t border-brand-100/80 bg-white/80 px-4 py-3.5 dark:border-brand-500/15 dark:bg-slate-950/40">
+                  <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-brand-700 dark:text-brand-300">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/80 px-2 py-0.5 text-[10.5px] uppercase tracking-wide dark:bg-brand-500/15">
+                      {scanResult.deviceType === 'laptop' ? (
+                        <Laptop className="h-3 w-3" />
+                      ) : (
+                        <PcCase className="h-3 w-3" />
+                      )}
+                      {scanResult.deviceType === 'laptop' ? 'Laptop' : 'Máy tính để bàn'}
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                      {scanResult.computerName}
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600">·</span>
+                    <span className="font-normal text-slate-400">
+                      {formatDateTime(scanResult.scannedAt)}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <ScanRow
+                      icon={<Cpu className="h-3.5 w-3.5" />}
+                      label="CPU"
+                      value={
+                        scanResult.cpu
+                          ? `${scanResult.cpu}${
+                              scanResult.cpuCores > 0
+                                ? ` · ${scanResult.cpuCores} nhân / ${scanResult.cpuThreads} luồng`
+                                : ''
+                            }`
+                          : ''
+                      }
+                    />
+                    <ScanRow
+                      icon={<MemoryStick className="h-3.5 w-3.5" />}
+                      label="RAM"
+                      value={
+                        scanResult.ramGB > 0
+                          ? `${scanResult.ramGB} GB${
+                              scanResult.ramType ? ` ${scanResult.ramType}` : ''
+                            }${scanResult.ramBus > 0 ? ` · ${scanResult.ramBus} MHz` : ''}`
+                          : ''
+                      }
+                    />
+                    <ScanRow
+                      icon={<HardDrive className="h-3.5 w-3.5" />}
+                      label="Ổ cứng"
+                      value={scanResult.storage}
+                    />
+                    <ScanRow
+                      icon={<Cpu className="h-3.5 w-3.5" />}
+                      label="Card đồ họa"
+                      value={
+                        scanResult.gpu
+                          ? `${scanResult.gpu}${
+                              scanResult.gpuMemory ? ` · ${scanResult.gpuMemory}` : ''
+                            }`
+                          : ''
+                      }
+                    />
+                    <ScanRow
+                      icon={<Monitor className="h-3.5 w-3.5" />}
+                      label={scanResult.deviceType === 'laptop' ? 'Màn hình' : 'Màn hình đi kèm'}
+                      value={
+                        scanResult.deviceType === 'laptop'
+                          ? scanResult.screenSize
+                            ? `${scanResult.screenSize}"${scanResult.monitor ? ` · ${scanResult.monitor}` : ''}`
+                            : scanResult.monitor
+                          : scanResult.monitor ||
+                            (scanResult.screenSize ? `${scanResult.screenSize}"` : '')
+                      }
+                    />
+                    <ScanRow
+                      icon={<ShieldCheck className="h-3.5 w-3.5" />}
+                      label="Hệ điều hành"
+                      value={`${scanResult.os} · ${scanResult.osLicense}`}
+                    />
+                    <ScanRow
+                      icon={<PcCase className="h-3.5 w-3.5" />}
+                      label="Serial"
+                      value={scanResult.serialNumber}
+                    />
+                    <ScanRow
+                      icon={<Network className="h-3.5 w-3.5" />}
+                      label="Địa chỉ IP"
+                      value={scanResult.ipAddresses}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           {error && (
             <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-[12.5px] font-medium text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />

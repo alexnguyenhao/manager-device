@@ -121,7 +121,48 @@ const API_SCRIPT = `
       open: (id) => call('files:open')(id),
       remove: (id) => call('files:remove')(id)
     },
-    app: { info: () => call('app:info')() }
+    app: { info: () => call('app:info')() },
+    hardware: {
+      scan: () => Promise.resolve({
+        computerName: 'PC-LEADER-01',
+        deviceType: 'laptop',
+        suggestedCategory: 'Laptop',
+        name: 'Dell Latitude 5450',
+        manufacturer: 'Dell Inc.',
+        model: 'Latitude 5450',
+        serialNumber: 'SN-TEST-001',
+        cpu: 'Intel Core i5-1335U',
+        cpuCores: 10,
+        cpuThreads: 12,
+        ramGB: 16,
+        ramType: 'DDR5',
+        ramBus: 4800,
+        storage: 'SSD NVMe 512GB',
+        gpu: 'Intel Iris Xe Graphics',
+        gpuMemory: 'Chia sẻ',
+        monitor: 'BOE 14 inch',
+        screenSize: 14,
+        os: 'Windows 11 Pro',
+        osLicense: 'Có bản quyền',
+        ipAddresses: '10.0.0.25',
+        note: 'Quét tự động 26/10/2026 10:00 • Máy: PC-LEADER-01',
+        scannedAt: '2026-10-26T10:00:00.000Z',
+        specs: {
+          cpu: 'Intel Core i5-1335U',
+          cpuCores: 10,
+          cpuThreads: 12,
+          ram: 16,
+          ramType: 'DDR5',
+          ramBus: 4800,
+          storage: 'SSD NVMe 512GB',
+          gpu: 'Intel Iris Xe Graphics',
+          gpuMemory: 'Chia sẻ',
+          screen: 14,
+          os: 'Windows 11 Pro',
+          osLicense: 'Có bản quyền'
+        }
+      })
+    }
   }
 })()
 `
@@ -275,8 +316,42 @@ async function main() {
   const drawerText = await page.locator('body').innerText()
   if (!drawerText.includes('Thêm thiết bị mới')) problems.push('[assets] Drawer thêm mới không mở')
   await shot(page, '16-asset-new')
-  const close = page.getByRole('button', { name: 'Đóng' }).first()
+  const close = page.getByRole('dialog').getByRole('button', { name: 'Đóng' }).first()
   if ((await close.count()) > 0) await close.click()
+  await settle(page, 500)
+
+  // Quét cấu hình máy: mở drawer, tự quét và điền sẵn biểu mẫu
+  currentRoute = '/assets?scan=1'
+  await page.goto(`${BASE}/#/assets`, { waitUntil: 'networkidle' })
+  await settle(page, 1100)
+  await page.getByRole('button', { name: 'Quét máy này' }).first().click()
+  await settle(page, 1300)
+  const scanDrawerText = await page.locator('body').innerText()
+  for (const expected of ['PC-LEADER-01', 'Intel Core i5-1335U', 'SSD NVMe 512GB', '10.0.0.25']) {
+    if (!scanDrawerText.includes(expected)) {
+      problems.push(`[assets] Kết quả quét thiếu "${expected}"`)
+    }
+  }
+  if ((await page.inputValue('#asset-name')) !== 'Dell Latitude 5450') {
+    problems.push('[assets] Quét không điền tên thiết bị')
+  }
+  if ((await page.inputValue('#asset-serial')) !== 'SN-TEST-001') {
+    problems.push('[assets] Quét không điền serial')
+  }
+  if ((await page.inputValue('#spec-cpu')) !== 'Intel Core i5-1335U') {
+    problems.push('[assets] Quét không điền CPU')
+  }
+  if ((await page.inputValue('#spec-ram')) !== '16') {
+    problems.push('[assets] Quét không điền RAM')
+  }
+  if ((await page.inputValue('#spec-storage')) !== 'SSD NVMe 512GB') {
+    problems.push('[assets] Quét không điền ổ cứng')
+  }
+  if ((await page.locator('#asset-category').inputValue()) === '') {
+    problems.push('[assets] Quét không tự chọn danh mục Laptop')
+  }
+  await shot(page, '16-scan-asset')
+  await page.getByRole('dialog').getByRole('button', { name: 'Đóng' }).first().click()
   await settle(page, 500)
 
   // Tạo thiết bị thật qua giao diện

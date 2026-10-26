@@ -746,6 +746,36 @@ export interface DriveConnectResult {
   accountEmail: string | null
 }
 
+/* ---------------------------- Hardware scan ---------------------------- */
+
+export interface HardwareScanResult {
+  computerName: string
+  deviceType: 'desktop' | 'laptop'
+  suggestedCategory: string
+  name: string
+  manufacturer: string
+  model: string
+  serialNumber: string
+  cpu: string
+  cpuCores: number
+  cpuThreads: number
+  ramGB: number
+  ramType: string
+  ramBus: number
+  storage: string
+  gpu: string
+  gpuMemory: string
+  monitor: string
+  screenSize: number | null
+  os: string
+  osLicense: string
+  ipAddresses: string
+  note: string
+  scannedAt: string
+  /** Các trường cấu hình đúng khóa của mẫu PC/Laptop trong ứng dụng. */
+  specs: Record<string, string | number>
+}
+
 /* ------------------------------- Common -------------------------------- */
 
 export interface PageResult<T> {
