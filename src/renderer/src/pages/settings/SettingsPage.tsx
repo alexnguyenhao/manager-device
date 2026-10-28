@@ -767,6 +767,15 @@ export function SettingsPage() {
                   onChange={(event) => update('loginNotice', event.target.value)}
                 />
               </Field>
+              <div className="rounded-xl border border-slate-200 px-3.5 py-3 sm:col-span-2 dark:border-slate-800">
+                <Switch
+                  checked={draft.allowSharedDecisionNumber}
+                  onChange={(checked) => update('allowSharedDecisionNumber', checked)}
+                  disabled={!canWrite}
+                  label="Cho phép nhiều HTTT dùng chung số quyết định"
+                  description="Bật khi một quyết định phê duyệt cấp độ áp dụng cho nhiều hệ thống thông tin. Khi tắt, số quyết định phải là duy nhất."
+                />
+              </div>
             </div>
           </div>
 

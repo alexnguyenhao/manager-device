@@ -21,6 +21,7 @@ import {
   Wrench
 } from 'lucide-react'
 import type {
+  AllocationType,
   Asset,
   AssetCondition,
   AssetInput,
@@ -82,6 +83,7 @@ interface FormState {
   condition: AssetCondition
   departmentId: string
   locationId: string
+  allocationType: AllocationType
   assignedEmployeeId: string
   supplierId: string
   purchaseDate: string
@@ -106,6 +108,7 @@ const EMPTY_FORM: FormState = {
   condition: 'new',
   departmentId: '',
   locationId: '',
+  allocationType: 'none',
   assignedEmployeeId: '',
   supplierId: '',
   purchaseDate: '',
@@ -133,6 +136,7 @@ function toForm(asset: Asset): FormState {
     condition: asset.condition,
     departmentId: asset.departmentId ? String(asset.departmentId) : '',
     locationId: asset.locationId ? String(asset.locationId) : '',
+    allocationType: asset.allocationType ?? (asset.assignedEmployeeId ? 'employee' : 'none'),
     assignedEmployeeId: asset.assignedEmployeeId ? String(asset.assignedEmployeeId) : '',
     supplierId: asset.supplierId ? String(asset.supplierId) : '',
     purchaseDate: asset.purchaseDate ?? '',
@@ -370,13 +374,41 @@ export function AssetFormDrawer({
     void runScanRef.current()
   }, [open, autoScan, assetId])
 
+  const onAllocationChange = (value: AllocationType): void => {
+    setForm((prev) => ({
+      ...prev,
+      allocationType: value,
+      assignedEmployeeId: value === 'employee' ? prev.assignedEmployeeId : '',
+      status:
+        value === 'department' && prev.departmentId
+          ? 'in_use'
+          : value === 'none' && prev.status === 'in_use'
+            ? 'available'
+            : prev.status
+    }))
+  }
+
   const onEmployeeChange = (value: string): void => {
     const employee = employees.find((e) => String(e.id) === value)
     setForm((prev) => ({
       ...prev,
+      allocationType: value ? 'employee' : 'none',
       assignedEmployeeId: value,
       departmentId: employee?.departmentId ? String(employee.departmentId) : prev.departmentId,
       status: value ? 'in_use' : prev.status === 'in_use' ? 'available' : prev.status
+    }))
+  }
+
+  const onDepartmentChange = (value: string): void => {
+    setForm((prev) => ({
+      ...prev,
+      departmentId: value,
+      status:
+        prev.allocationType === 'department' && value
+          ? 'in_use'
+          : prev.allocationType === 'department' && !value && prev.status === 'in_use'
+            ? 'available'
+            : prev.status
     }))
   }
 
@@ -385,7 +417,15 @@ export function AssetFormDrawer({
       ...prev,
       status: value,
       assignedEmployeeId:
-        value === 'in_use' || value === 'maintenance' ? prev.assignedEmployeeId : ''
+        value === 'in_use' || value === 'maintenance'
+          ? prev.assignedEmployeeId
+          : value === 'available' || value === 'reserved' || value === 'disposed' || value === 'lost'
+            ? ''
+            : prev.assignedEmployeeId,
+      allocationType:
+        value === 'available' || value === 'reserved' || value === 'disposed' || value === 'lost'
+          ? 'none'
+          : prev.allocationType
     }))
   }
 
@@ -416,8 +456,18 @@ export function AssetFormDrawer({
       setError('Vui lòng chọn danh mục thiết bị.')
       return
     }
-    if (form.status === 'in_use' && !form.assignedEmployeeId) {
+    if (form.status === 'in_use' && form.allocationType === 'employee' && !form.assignedEmployeeId) {
       setError('Vui lòng chọn người sử dụng khi thiết bị ở trạng thái "Đang sử dụng".')
+      return
+    }
+    if (form.status === 'in_use' && form.allocationType === 'department' && !form.departmentId) {
+      setError('Vui lòng chọn phòng ban được phân bổ khi thiết bị ở trạng thái "Đang sử dụng".')
+      return
+    }
+    if (form.status === 'in_use' && form.allocationType === 'none') {
+      setError(
+        'Vui lòng chọn hình thức phân bổ (nhân viên hoặc phòng ban) khi thiết bị ở trạng thái "Đang sử dụng".'
+      )
       return
     }
     if (Number(form.salvageValue) > Number(form.purchasePrice) && Number(form.purchasePrice) > 0) {
@@ -451,7 +501,11 @@ export function AssetFormDrawer({
       condition: form.condition,
       departmentId: form.departmentId ? Number(form.departmentId) : null,
       locationId: form.locationId ? Number(form.locationId) : null,
-      assignedEmployeeId: form.assignedEmployeeId ? Number(form.assignedEmployeeId) : null,
+      allocationType: form.allocationType,
+      assignedEmployeeId:
+        form.allocationType === 'employee' && form.assignedEmployeeId
+          ? Number(form.assignedEmployeeId)
+          : null,
       supplierId: form.supplierId ? Number(form.supplierId) : null,
       purchaseDate: form.purchaseDate || null,
       purchasePrice: Number(form.purchasePrice) || 0,
@@ -769,40 +823,80 @@ export function AssetFormDrawer({
                 </Select>
               </Field>
               <Field
-                label="Người sử dụng"
-                hint={
-                  form.status !== 'in_use' && form.status !== 'maintenance'
-                    ? 'Chọn nhân viên để tự động chuyển trạng thái sang "Đang sử dụng".'
-                    : selectedEmployee?.position ?? undefined
-                }
-                htmlFor="asset-employee"
+                label="Hình thức phân bổ"
+                hint="Giao cho nhân viên hoặc phân bổ cho phòng ban mà không cần giao cho nhân viên."
+                htmlFor="asset-allocation"
               >
                 <Select
-                  id="asset-employee"
-                  value={form.assignedEmployeeId}
-                  onChange={(event) => onEmployeeChange(event.target.value)}
-                  disabled={form.status === 'disposed' || form.status === 'lost' || form.status === 'available' || form.status === 'reserved'}
+                  id="asset-allocation"
+                  value={form.allocationType}
+                  onChange={(event) => onAllocationChange(event.target.value as AllocationType)}
+                  disabled={
+                    form.status === 'disposed' ||
+                    form.status === 'lost' ||
+                    form.status === 'available' ||
+                    form.status === 'reserved'
+                  }
                 >
-                  <option value="">Chưa cấp phát</option>
-                  {employees
-                    .filter(
-                      (employee) =>
-                        employee.isActive || String(employee.id) === form.assignedEmployeeId
-                    )
-                    .map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.fullName}
-                        {employee.code ? ` (${employee.code})` : ''}
-                        {employee.isActive ? '' : ' - đã nghỉ'}
-                      </option>
-                    ))}
+                  <option value="none">Chưa phân bổ</option>
+                  <option value="employee">Giao cho nhân viên</option>
+                  <option value="department">Phân bổ cho phòng ban</option>
                 </Select>
               </Field>
-              <Field label="Phòng ban" htmlFor="asset-department">
+              {form.allocationType === 'employee' && (
+                <Field
+                  label="Người sử dụng"
+                  required={form.status === 'in_use'}
+                  hint={
+                    form.status !== 'in_use' && form.status !== 'maintenance'
+                      ? 'Chọn nhân viên để tự động chuyển trạng thái sang "Đang sử dụng".'
+                      : selectedEmployee?.position ?? undefined
+                  }
+                  htmlFor="asset-employee"
+                >
+                  <Select
+                    id="asset-employee"
+                    value={form.assignedEmployeeId}
+                    onChange={(event) => onEmployeeChange(event.target.value)}
+                    disabled={
+                      form.status === 'disposed' ||
+                      form.status === 'lost' ||
+                      form.status === 'available' ||
+                      form.status === 'reserved'
+                    }
+                  >
+                    <option value="">Chưa cấp phát</option>
+                    {employees
+                      .filter(
+                        (employee) =>
+                          employee.isActive || String(employee.id) === form.assignedEmployeeId
+                      )
+                      .map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                          {employee.fullName}
+                          {employee.code ? ` (${employee.code})` : ''}
+                          {employee.isActive ? '' : ' - đã nghỉ'}
+                        </option>
+                      ))}
+                  </Select>
+                </Field>
+              )}
+              <Field
+                label="Phòng ban"
+                required={form.allocationType === 'department' && form.status === 'in_use'}
+                hint={
+                  form.allocationType === 'department'
+                    ? 'Thiết bị được phân bổ cho phòng ban này, không gắn với nhân viên cụ thể.'
+                    : form.allocationType === 'employee'
+                      ? 'Tự động theo phòng ban của nhân viên được chọn.'
+                      : undefined
+                }
+                htmlFor="asset-department"
+              >
                 <Select
                   id="asset-department"
                   value={form.departmentId}
-                  onChange={(event) => update('departmentId', event.target.value)}
+                  onChange={(event) => onDepartmentChange(event.target.value)}
                 >
                   <option value="">Chưa phân phòng ban</option>
                   {ORG_BLOCK_OPTIONS.map((block) => {

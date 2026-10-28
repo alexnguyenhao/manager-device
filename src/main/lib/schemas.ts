@@ -22,6 +22,10 @@ const optionalId = z.preprocess(
 
 const money = z.coerce.number().min(0, 'Giá trị không được âm.').optional()
 const nonNegativeInt = z.coerce.number().int().min(0).optional()
+const requiredCount = z.coerce
+  .number()
+  .int('Số lượng phải là số nguyên.')
+  .min(0, 'Số lượng không được âm.')
 
 export const loginSchema = z.object({
   username: z.string().trim().min(1, 'Vui lòng nhập tên đăng nhập.').max(50),
@@ -164,6 +168,7 @@ export const assetListSchema = z.object({
   condition: z.string().optional(),
   supplierId: optionalId,
   assignedEmployeeId: optionalId,
+  allocationType: z.enum(['none', 'employee', 'department', 'all']).optional(),
   warrantyExpiringDays: optionalId,
   sortBy: z.string().optional(),
   sortDir: z.enum(['asc', 'desc']).optional(),
@@ -268,6 +273,73 @@ export const reportSchema = z.object({
   toDate: dateString
 })
 
+/* ---------------------- Hạ tầng CNTT & HTTT --------------------------- */
+
+export const infrastructureSchema = z.object({
+  physicalServers: requiredCount,
+  virtualServers: requiredCount,
+  switches: requiredCount,
+  firewalls: requiredCount,
+  note: optionalText()
+})
+
+const systemLevelSchema = z.preprocess(
+  (value) => {
+    if (value === '' || value === null || value === undefined || value === 'unset') return null
+    return Number(value)
+  },
+  z
+    .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)])
+    .nullable()
+    .optional()
+)
+
+export const systemSchema = z.object({
+  id: optionalId,
+  code: z.string().trim().max(50).optional(),
+  name: z.string().trim().min(2, 'Vui lòng nhập tên hệ thống thông tin.').max(200),
+  description: optionalText(4000),
+  managingUnit: z.string().trim().min(2, 'Vui lòng nhập đơn vị quản lý, vận hành.').max(200),
+  departmentId: optionalId,
+  level: systemLevelSchema,
+  decisionNumber: optionalText(80),
+  decisionDate: dateString,
+  decisionAgency: optionalText(200),
+  status: z.enum(['operating', 'building', 'suspended']).optional(),
+  hostingType: z.enum(['none', 'physical', 'virtual', 'cloud', 'hybrid']).optional(),
+  hostingDetail: optionalText(300),
+  assetId: optionalId
+})
+
+export const systemListSchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+  search: z.string().trim().max(200).optional(),
+  level: z
+    .union([
+      z.enum(['1', '2', '3', '4', '5', 'unset', 'all']),
+      z.coerce.number().int().min(1).max(5),
+      z.null()
+    ])
+    .optional(),
+  status: z
+    .union([z.enum(['operating', 'building', 'suspended', 'all']), z.null()])
+    .optional(),
+  departmentId: optionalId,
+  managingUnit: z.string().trim().max(200).optional(),
+  fromDate: dateString,
+  toDate: dateString,
+  sortBy: z.enum(['code', 'name', 'level', 'updatedAt']).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional()
+})
+
+export const systemFileSchema = z.object({
+  systemId: z.coerce.number().int().positive(),
+  documentType: z.enum(['decision', 'profile', 'other']).optional()
+})
+
+export const systemFileIdSchema = z.coerce.number().int().positive()
+
 export const settingsSchema = z.object({
   companyName: z.string().trim().max(200).optional(),
   companyAddress: z.string().trim().max(300).optional(),
@@ -280,7 +352,8 @@ export const settingsSchema = z.object({
   warrantyWarningDays: z.coerce.number().int().min(0).max(3650).optional(),
   maintenanceWarningDays: z.coerce.number().int().min(0).max(3650).optional(),
   defaultDepreciationMonths: z.coerce.number().int().min(0).max(1200).optional(),
-  loginNotice: z.string().trim().max(300).optional()
+  loginNotice: z.string().trim().max(300).optional(),
+  allowSharedDecisionNumber: z.boolean().optional()
 })
 
 export const userCreateSchema = z.object({

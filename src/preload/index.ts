@@ -50,6 +50,7 @@ const api: WindowApi = {
     byIds: (ids) => invoke('assets:byIds', ids),
     updateStatus: (id, status, note) => invoke('assets:updateStatus', id, status, note),
     exportExcel: (params) => invoke('assets:exportExcel', params),
+    exportConfigExcel: (params) => invoke('assets:exportConfigExcel', params),
     importExcel: () => invoke('assets:importExcel'),
     downloadTemplate: () => invoke('assets:downloadTemplate')
   },
@@ -85,6 +86,27 @@ const api: WindowApi = {
   reports: {
     get: (params) => invoke('reports:get', params),
     export: (params) => invoke('reports:export', params)
+  },
+  infrastructure: {
+    get: () => invoke('infrastructure:get'),
+    update: (data) => invoke('infrastructure:update', data)
+  },
+  systems: {
+    list: (params) => invoke('systems:list', params),
+    get: (id) => invoke('systems:get', id),
+    nextCode: () => invoke('systems:nextCode'),
+    save: (data) => invoke('systems:save', data),
+    remove: (id) => invoke('systems:remove', id),
+    dashboard: () => invoke('systems:dashboard'),
+    summary: () => invoke('systems:summary'),
+    uploadFile: (systemId, documentType) =>
+      invoke('systems:uploadFile', systemId, documentType),
+    openFile: (id) => invoke('systems:openFile', id),
+    removeFile: (id) => invoke('systems:removeFile', id),
+    exportExcel: (params) => invoke('systems:exportExcel', params),
+    exportPdf: (params) => invoke('systems:exportPdf', params),
+    importExcel: () => invoke('systems:importExcel'),
+    downloadTemplate: () => invoke('systems:downloadTemplate')
   },
   users: {
     list: () => invoke('users:list'),

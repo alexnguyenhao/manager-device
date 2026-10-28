@@ -24,7 +24,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   warrantyWarningDays: 30,
   maintenanceWarningDays: 14,
   defaultDepreciationMonths: 60,
-  loginNotice: 'Hệ thống quản lý thiết bị và tài sản công của UBND xã'
+  loginNotice: 'Hệ thống quản lý thiết bị và tài sản công của UBND xã',
+  allowSharedDecisionNumber: false
 }
 
 const KEY_MAP: Record<keyof AppSettings, string> = {
@@ -39,7 +40,8 @@ const KEY_MAP: Record<keyof AppSettings, string> = {
   warrantyWarningDays: 'warranty_warning_days',
   maintenanceWarningDays: 'maintenance_warning_days',
   defaultDepreciationMonths: 'default_depreciation_months',
-  loginNotice: 'login_notice'
+  loginNotice: 'login_notice',
+  allowSharedDecisionNumber: 'allow_shared_decision_number'
 }
 
 const NUMBER_KEYS: Array<keyof AppSettings> = [
@@ -47,6 +49,8 @@ const NUMBER_KEYS: Array<keyof AppSettings> = [
   'maintenanceWarningDays',
   'defaultDepreciationMonths'
 ]
+
+const BOOLEAN_KEYS: Array<keyof AppSettings> = ['allowSharedDecisionNumber']
 
 export function getSettings(): AppSettings {
   const rows = getDb().prepare('SELECT key, value FROM settings').all() as Array<{
@@ -61,6 +65,8 @@ export function getSettings(): AppSettings {
     if (NUMBER_KEYS.includes(field)) {
       const parsed = Number(value)
       if (Number.isFinite(parsed)) settings[field] = parsed as never
+    } else if (BOOLEAN_KEYS.includes(field)) {
+      settings[field] = (value === '1' || value === 'true') as never
     } else {
       settings[field] = value as never
     }
@@ -125,12 +131,17 @@ export function clearBusinessData(user: AuthUser): { removed: number } {
     db.exec('DELETE FROM audit_items')
     db.exec('DELETE FROM audit_sessions')
     db.exec('DELETE FROM maintenance_records')
+    db.exec('DELETE FROM department_assignments')
     db.exec('DELETE FROM asset_assignments')
     db.exec('DELETE FROM attachments')
+    db.exec('DELETE FROM information_system_files')
+    db.exec('DELETE FROM information_systems')
+    db.exec('DELETE FROM it_infrastructure_history')
+    db.exec('UPDATE it_infrastructure SET physical_servers = 0, virtual_servers = 0, switches = 0, firewalls = 0, note = NULL')
     db.exec('DELETE FROM assets')
     db.exec('DELETE FROM activity_logs')
     db.exec(
-      "DELETE FROM sqlite_sequence WHERE name IN ('audit_items','audit_sessions','maintenance_records','asset_assignments','attachments','assets','activity_logs')"
+      "DELETE FROM sqlite_sequence WHERE name IN ('audit_items','audit_sessions','maintenance_records','department_assignments','asset_assignments','attachments','information_system_files','information_systems','it_infrastructure_history','assets','activity_logs')"
     )
     db.exec('COMMIT')
   } catch (error) {
@@ -149,6 +160,6 @@ export function clearBusinessData(user: AuthUser): { removed: number } {
   } catch {
     // thư mục uploads có thể chưa tồn tại
   }
-  logActivity(user, 'Xóa toàn bộ dữ liệu nghiệp vụ', 'settings', null, 'Thiết bị, cấp phát, bảo trì, kiểm kê')
+  logActivity(user, 'Xóa toàn bộ dữ liệu nghiệp vụ', 'settings', null, 'Thiết bị, cấp phát, bảo trì, kiểm kê, HTTT, hạ tầng')
   return { removed: count }
 }

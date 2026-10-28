@@ -51,7 +51,18 @@ import type {
   UserInput,
   ActivityLog,
   AssetStatus,
-  HardwareScanResult
+  HardwareScanResult,
+  InformationSystem,
+  InformationSystemDetail,
+  InformationSystemFile,
+  InformationSystemInput,
+  InformationSystemListParams,
+  InfrastructureOverview,
+  ItInfrastructureInput,
+  SystemDashboard,
+  SystemDocumentType,
+  SystemSaveResult,
+  SystemSummaryKpis
 } from './types'
 
 export type AssetExportParams = AssetListParams
@@ -88,6 +99,7 @@ export interface WindowApi {
     byIds: (ids: number[]) => Promise<Asset[]>
     updateStatus: (id: number, status: AssetStatus, note?: string) => Promise<Asset>
     exportExcel: (params: AssetExportParams) => Promise<ExportResult>
+    exportConfigExcel: (params: AssetExportParams) => Promise<ExportResult>
     importExcel: () => Promise<ImportResult>
     downloadTemplate: () => Promise<ExportResult>
   }
@@ -123,6 +135,31 @@ export interface WindowApi {
   reports: {
     get: (params: ReportParams) => Promise<ReportData>
     export: (params: ReportParams) => Promise<ExportResult>
+  }
+  infrastructure: {
+    get: () => Promise<InfrastructureOverview>
+    update: (data: ItInfrastructureInput) => Promise<InfrastructureOverview>
+  }
+  systems: {
+    list: (params: InformationSystemListParams) => Promise<PageResult<InformationSystem>>
+    get: (id: number) => Promise<InformationSystemDetail>
+    nextCode: () => Promise<string>
+    save: (
+      data: InformationSystemInput & { id?: number }
+    ) => Promise<SystemSaveResult>
+    remove: (id: number) => Promise<void>
+    dashboard: () => Promise<SystemDashboard>
+    summary: () => Promise<SystemSummaryKpis>
+    uploadFile: (
+      systemId: number,
+      documentType: SystemDocumentType
+    ) => Promise<InformationSystemFile | null>
+    openFile: (id: number) => Promise<void>
+    removeFile: (id: number) => Promise<void>
+    exportExcel: (params: InformationSystemListParams) => Promise<ExportResult>
+    exportPdf: (params: InformationSystemListParams) => Promise<ExportResult>
+    importExcel: () => Promise<ImportResult>
+    downloadTemplate: () => Promise<ExportResult>
   }
   users: {
     list: () => Promise<UserAccount[]>

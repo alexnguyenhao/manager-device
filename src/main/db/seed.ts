@@ -53,6 +53,8 @@ export function seedDatabase(database: DatabaseSync): void {
       suppliers,
       employees
     })
+    seedInfrastructure(users)
+    seedSystems(users, departments)
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')
@@ -180,6 +182,8 @@ function seedCategories(): Record<string, number> {
         { key: 'gpu', label: 'Card đồ họa (GPU)', type: 'text', placeholder: 'Intel UHD 730' },
         { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
         { key: 'monitor', label: 'Màn hình', type: 'text' },
+        { key: 'screenResolution', label: 'Độ phân giải màn hình', type: 'text', placeholder: '1920 x 1080' },
+        { key: 'refreshRate', label: 'Tần số quét', type: 'number', unit: 'Hz' },
         {
           key: 'os',
           label: 'Hệ điều hành',
@@ -217,6 +221,8 @@ function seedCategories(): Record<string, number> {
         { key: 'gpu', label: 'Card đồ họa (GPU)', type: 'text', placeholder: 'Intel Iris Xe' },
         { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
         { key: 'screen', label: 'Kích thước màn hình', type: 'text', unit: 'inch' },
+        { key: 'screenResolution', label: 'Độ phân giải màn hình', type: 'text', placeholder: '1920 x 1080' },
+        { key: 'refreshRate', label: 'Tần số quét', type: 'number', unit: 'Hz' },
         {
           key: 'os',
           label: 'Hệ điều hành',
@@ -245,7 +251,11 @@ function seedCategories(): Record<string, number> {
         { key: 'resolution', label: 'Độ phân giải', type: 'text', placeholder: '1200 x 1200 dpi' },
         { key: 'paper', label: 'Khổ giấy', type: 'select', options: ['A4', 'A3', 'A4/A3'] },
         { key: 'connection', label: 'Kết nối', type: 'select', options: ['USB', 'LAN', 'Wi-Fi', 'USB + LAN', 'USB + LAN + Wi-Fi'] },
-        { key: 'color', label: 'In màu', type: 'select', options: ['Có', 'Không'] }
+        { key: 'color', label: 'In màu', type: 'select', options: ['Có', 'Không'] },
+        { key: 'duplex', label: 'In hai mặt', type: 'select', options: ['Không', 'Có (trục dài)', 'Có (trục ngắn)'] },
+        { key: 'ipAddress', label: 'Địa chỉ IP', type: 'text', placeholder: '192.168.1.50' },
+        { key: 'driver', label: 'Driver máy in', type: 'text' },
+        { key: 'port', label: 'Cổng in', type: 'text', placeholder: 'IP_192.168.1.50' }
       ]
     },
     {
@@ -1009,6 +1019,30 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
     )
   }
 
+  // Thiết bị phân bổ cho phòng ban (không gắn với nhân viên cụ thể)
+  const departmentAssetId = assetIds['PRN-0003']
+  const departmentAssetDept = ctx.departments['VHXH']
+  if (departmentAssetId && departmentAssetDept) {
+    db.prepare(
+      `UPDATE assets SET status = 'in_use', allocation_type = 'department',
+         department_id = ?, location_id = ?, updated_at = ?
+       WHERE id = ?`
+    ).run(departmentAssetDept, ctx.locations['TRU-SO'] ?? null, now, departmentAssetId)
+    insert(
+      `INSERT INTO department_assignments
+        (asset_id, department_id, assigned_date, returned_date, status, note, return_note, created_by, created_at)
+       VALUES (?, ?, ?, NULL, 'active', ?, NULL, ?, ?)`,
+      [
+        departmentAssetId,
+        departmentAssetDept,
+        monthsAgo(3),
+        'Phân bổ máy in cho phòng ban sử dụng, không gắn nhân viên',
+        manager,
+        now
+      ]
+    )
+  }
+
   // Lịch sử cấp phát đã thu hồi
   const historyRows: Array<[string, string, string, string, string | null]> = [
     ['PC-0003', 'CB017', monthsAgo(18), monthsAgo(4), 'Thu hồi do nâng cấp thiết bị'],
@@ -1297,6 +1331,339 @@ function seedAssetsAndTransactions(ctx: SeedContext): void {
       `INSERT INTO activity_logs (user_id, username, action, entity_type, entity_id, entity_label, details, created_at)
        VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
       [userId, userRow?.username ?? null, action, entityType, entityId, label, createdAt]
+    )
+  }
+}
+
+/* --------------------- Hạ tầng CNTT & hệ thống thông tin ------------------ */
+
+function seedInfrastructure(users: Record<string, number>): void {
+  const staff = users.staff
+  const admin = users.admin
+  const first = stampOffset(-180, 9)
+  const second = stampOffset(-45, 10)
+  const current = {
+    physical: 3,
+    virtual: 12,
+    switches: 14,
+    firewalls: 2
+  }
+
+  db.prepare(
+    `UPDATE it_infrastructure SET
+       physical_servers = ?, virtual_servers = ?, switches = ?, firewalls = ?,
+       note = ?, updated_by = ?, updated_at = ?
+     WHERE id = 1`
+  ).run(
+    current.physical,
+    current.virtual,
+    current.switches,
+    current.firewalls,
+    'Phòng máy chủ đặt tại tầng 2 trụ sở UBND xã; hệ thống ảo hóa VMware ESXi 8.0.',
+    staff,
+    second
+  )
+
+  const history: Array<{
+    values: typeof current
+    note: string
+    changedBy: number
+    changedAt: string
+    changes: Array<{ field: string; label: string; before: string | null; after: string | null }>
+  }> = [
+    {
+      values: { physical: 2, virtual: 9, switches: 11, firewalls: 2 },
+      note: 'Khảo sát, cập nhật số liệu hạ tầng đầu năm.',
+      changedBy: admin,
+      changedAt: first,
+      changes: [
+        { field: 'physicalServers', label: 'Số máy chủ vật lý', before: null, after: '2' },
+        { field: 'virtualServers', label: 'Số máy ảo', before: null, after: '9' },
+        { field: 'switches', label: 'Số switch', before: null, after: '11' },
+        { field: 'firewalls', label: 'Số firewall', before: null, after: '2' }
+      ]
+    },
+    {
+      values: current,
+      note: 'Bổ sung 01 máy chủ vật lý, 03 máy ảo và 03 switch cho hệ thống một cửa.',
+      changedBy: staff,
+      changedAt: second,
+      changes: [
+        { field: 'physicalServers', label: 'Số máy chủ vật lý', before: '2', after: '3' },
+        { field: 'virtualServers', label: 'Số máy ảo', before: '9', after: '12' },
+        { field: 'switches', label: 'Số switch', before: '11', after: '14' }
+      ]
+    }
+  ]
+
+  for (const entry of history) {
+    const userName = db
+      .prepare('SELECT full_name FROM users WHERE id = ?')
+      .get(entry.changedBy) as { full_name: string } | undefined
+    insert(
+      `INSERT INTO it_infrastructure_history
+        (physical_servers, virtual_servers, switches, firewalls, note, changes,
+         changed_by, changed_by_name, changed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        entry.values.physical,
+        entry.values.virtual,
+        entry.values.switches,
+        entry.values.firewalls,
+        entry.note,
+        JSON.stringify(entry.changes),
+        entry.changedBy,
+        userName?.full_name ?? null,
+        entry.changedAt
+      ]
+    )
+  }
+}
+
+interface SeedSystem {
+  code: string
+  name: string
+  description: string
+  unit: string
+  department: string
+  level: number | null
+  decision?: string | null
+  decisionDate?: string | null
+  agency?: string | null
+  status: 'operating' | 'building' | 'suspended'
+  hosting: 'none' | 'physical' | 'virtual' | 'cloud' | 'hybrid'
+  hostingDetail?: string | null
+  updatedDaysAgo: number
+}
+
+function seedSystems(
+  users: Record<string, number>,
+  departments: Record<string, number>
+): void {
+  const rows: SeedSystem[] = [
+    {
+      code: 'HTTT-0001',
+      name: 'Hệ thống Quản lý văn bản và Điều hành',
+      description:
+        'Tiếp nhận, xử lý văn bản đi - đến; quản lý hồ sơ công việc và điều hành tác nghiệp của UBND xã.',
+      unit: 'Văn phòng HĐND và UBND',
+      department: 'VP',
+      level: 3,
+      decision: '85/QĐ-UBND',
+      decisionDate: monthsAgo(14),
+      agency: 'UBND xã An Bình',
+      status: 'operating',
+      hosting: 'virtual',
+      hostingDetail: 'Máy chủ ảo ESXi-01 (10.10.1.21)',
+      updatedDaysAgo: 2
+    },
+    {
+      code: 'HTTT-0002',
+      name: 'Cổng thông tin điện tử xã An Bình',
+      description:
+        'Công bố thông tin, tin tức, thủ tục hành chính và tương tác với người dân trên môi trường mạng.',
+      unit: 'Văn phòng HĐND và UBND',
+      department: 'VP',
+      level: 2,
+      decision: '86/QĐ-UBND',
+      decisionDate: monthsAgo(13),
+      agency: 'UBND xã An Bình',
+      status: 'operating',
+      hosting: 'cloud',
+      hostingDetail: 'Thuê dịch vụ hạ tầng tại Trung tâm dữ liệu tỉnh',
+      updatedDaysAgo: 5
+    },
+    {
+      code: 'HTTT-0003',
+      name: 'Hệ thống Một cửa điện tử',
+      description:
+        'Tiếp nhận, luân chuyển và trả kết quả giải quyết thủ tục hành chính theo cơ chế một cửa, một cửa liên thông.',
+      unit: 'Trung tâm Phục vụ Hành chính Công',
+      department: 'PVHCC',
+      level: 3,
+      decision: '87/QĐ-UBND',
+      decisionDate: monthsAgo(11),
+      agency: 'UBND xã An Bình',
+      status: 'operating',
+      hosting: 'physical',
+      hostingDetail: 'Máy chủ vật lý SRV-02 tại phòng máy tầng 2',
+      updatedDaysAgo: 1
+    },
+    {
+      code: 'HTTT-0004',
+      name: 'Hệ thống Quản lý cán bộ, công chức',
+      description: 'Quản lý hồ sơ, quá trình công tác, đào tạo và đánh giá cán bộ, công chức.',
+      unit: 'Văn phòng HĐND và UBND',
+      department: 'VP',
+      level: 1,
+      decision: '88/QĐ-UBND',
+      decisionDate: monthsAgo(10),
+      agency: 'UBND xã An Bình',
+      status: 'operating',
+      hosting: 'virtual',
+      hostingDetail: 'Máy chủ ảo ESXi-02 (10.10.1.24)',
+      updatedDaysAgo: 9
+    },
+    {
+      code: 'HTTT-0005',
+      name: 'Hệ thống Kế toán tài chính',
+      description: 'Hạch toán kế toán, quản lý ngân sách, tài sản và báo cáo tài chính của đơn vị.',
+      unit: 'Phòng Kinh tế',
+      department: 'KT',
+      level: 2,
+      decision: '89/QĐ-UBND',
+      decisionDate: monthsAgo(9),
+      agency: 'UBND xã An Bình',
+      status: 'operating',
+      hosting: 'virtual',
+      hostingDetail: 'Máy chủ ảo ESXi-01 (10.10.1.22)',
+      updatedDaysAgo: 15
+    },
+    {
+      code: 'HTTT-0006',
+      name: 'Hệ thống Quản lý đất đai',
+      description: 'Quản lý hồ sơ địa chính, biến động đất đai và cấp giấy chứng nhận quyền sử dụng đất.',
+      unit: 'Phòng Kinh tế',
+      department: 'KT',
+      level: 3,
+      decision: '90/QĐ-UBND',
+      decisionDate: null,
+      agency: null,
+      status: 'operating',
+      hosting: 'physical',
+      hostingDetail: 'Máy chủ vật lý SRV-03 tại phòng máy tầng 2',
+      updatedDaysAgo: 22
+    },
+    {
+      code: 'HTTT-0007',
+      name: 'Hệ thống Thư điện tử công vụ',
+      description: 'Hộp thư điện tử công vụ phục vụ trao đổi văn bản giữa các cơ quan nhà nước.',
+      unit: 'Văn phòng HĐND và UBND',
+      department: 'VP',
+      level: 2,
+      decision: '91/QĐ-UBND',
+      decisionDate: monthsAgo(8),
+      agency: 'Sở Thông tin và Truyền thông',
+      status: 'operating',
+      hosting: 'cloud',
+      hostingDetail: 'Nền tảng thư điện tử dùng chung của tỉnh',
+      updatedDaysAgo: 30
+    },
+    {
+      code: 'HTTT-0008',
+      name: 'Hệ thống Quản lý hồ sơ sức khỏe',
+      description: 'Quản lý hồ sơ sức khỏe, khám chữa bệnh ban đầu và chính sách bảo hiểm y tế.',
+      unit: 'Phòng Văn hóa - Xã hội',
+      department: 'VHXH',
+      level: null,
+      decision: null,
+      decisionDate: null,
+      agency: null,
+      status: 'building',
+      hosting: 'none',
+      hostingDetail: null,
+      updatedDaysAgo: 4
+    },
+    {
+      code: 'HTTT-0009',
+      name: 'Hệ thống Giám sát camera an ninh',
+      description: 'Giám sát hình ảnh tại trụ sở và các khu vực công cộng trên địa bàn xã.',
+      unit: 'Trung tâm Dịch vụ Tổng hợp',
+      department: 'DVTH',
+      level: null,
+      decision: null,
+      decisionDate: null,
+      agency: null,
+      status: 'operating',
+      hosting: 'hybrid',
+      hostingDetail: 'Đầu ghi hình tại trụ sở, lưu trữ đám mây',
+      updatedDaysAgo: 12
+    },
+    {
+      code: 'HTTT-0010',
+      name: 'Hệ thống Quản lý tài sản công',
+      description: 'Quản lý, theo dõi biến động tài sản công của đơn vị và báo cáo định kỳ.',
+      unit: 'Văn phòng HĐND và UBND',
+      department: 'VP',
+      level: 4,
+      decision: '92/QĐ-UBND',
+      decisionDate: monthsAgo(6),
+      agency: 'UBND huyện',
+      status: 'operating',
+      hosting: 'hybrid',
+      hostingDetail: 'Máy chủ vật lý SRV-01 và sao lưu đám mây',
+      updatedDaysAgo: 3
+    }
+  ]
+
+  const admin = users.admin
+  for (const row of rows) {
+    const createdAt = stampOffset(-200, 10)
+    const updatedAt = stampOffset(-row.updatedDaysAgo, 11)
+    const departmentId = departments[row.department] ?? null
+    const searchText = normalizeForSearch(
+      [
+        row.code,
+        row.name,
+        row.description,
+        row.unit,
+        row.decision,
+        row.agency
+      ]
+        .filter(Boolean)
+        .join(' ')
+    )
+    insert(
+      `INSERT INTO information_systems
+        (code, name, description, managing_unit, department_id, level, decision_number,
+         decision_date, decision_agency, status, hosting_type, hosting_detail, asset_id,
+         search_text, is_deleted, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0, ?, ?, ?)`,
+      [
+        row.code,
+        row.name,
+        row.description,
+        row.unit,
+        departmentId,
+        row.level,
+        row.decision ?? null,
+        row.decisionDate ?? null,
+        row.agency ?? null,
+        row.status,
+        row.hosting,
+        row.hostingDetail ?? null,
+        searchText,
+        admin,
+        createdAt,
+        updatedAt
+      ]
+    )
+  }
+
+  const logEntries: Array<[string, string, string, string]> = [
+    ['Cập nhật HTTT', 'HTTT-0003', 'HTTT-0003 - Hệ thống Một cửa điện tử', 'Bổ sung hình thức triển khai máy chủ vật lý'],
+    ['Tạo HTTT', 'HTTT-0010', 'HTTT-0010 - Hệ thống Quản lý tài sản công', 'Cấp độ 4; QĐ 92/QĐ-UBND'],
+    ['Tạo HTTT', 'HTTT-0008', 'HTTT-0008 - Hệ thống Quản lý hồ sơ sức khỏe', 'Chưa xác định cấp độ; Đang xây dựng']
+  ]
+  for (const [action, code, label, details] of logEntries) {
+    const target = db
+      .prepare('SELECT id FROM information_systems WHERE code = ?')
+      .get(code) as { id: number } | undefined
+    const userRow = db
+      .prepare('SELECT username FROM users WHERE id = ?')
+      .get(admin) as { username: string } | undefined
+    insert(
+      `INSERT INTO activity_logs (user_id, username, action, entity_type, entity_id, entity_label, details, created_at)
+       VALUES (?, ?, ?, 'information_system', ?, ?, ?, ?)`,
+      [
+        admin,
+        userRow?.username ?? null,
+        action,
+        target?.id ?? null,
+        label,
+        details,
+        stampOffset(-3, 9)
+      ]
     )
   }
 }

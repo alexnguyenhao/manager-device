@@ -5,6 +5,7 @@ import { listAssignments } from './assignment.service'
 import { listMaintenance } from './maintenance.service'
 import { listLogs } from './log-list.service'
 import { getSettings } from './settings.service'
+import { getSystemSummary } from './system.service'
 import { getDb } from '../db/database'
 import { addMonths, todayISO } from '../../shared/utils'
 
@@ -121,6 +122,7 @@ export function getDashboard(): DashboardData {
       maintenanceDue: maintenanceDue.length,
       activeAssignments: listAssignments({ status: 'active', pageSize: 5 }).total
     },
+    systemSummary: getSystemSummary(),
     byCategory: [...categoryMap.values()].sort((a, b) => b.count - a.count),
     byStatus: statuses
       .map((status) => ({ status, count: counts.get(status) ?? 0 }))

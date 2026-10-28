@@ -9,7 +9,7 @@ async function main(): Promise<void> {
   const { openDatabase, getDb, closeDatabase } = await import('../src/main/db/database')
   const { login } = await import('../src/main/services/auth.service')
   const { listAssets, createAsset, getAssetDetail } = await import('../src/main/services/asset.service')
-  const { listCategories, listEmployees, saveCategory } = await import(
+  const { listCategories, listDepartments, listEmployees, saveCategory } = await import(
     '../src/main/services/catalog.service'
   )
   const { createAssignment, returnAssignment } = await import(
@@ -30,11 +30,24 @@ async function main(): Promise<void> {
     '../src/main/services/user.service'
   )
   const { listLogs } = await import('../src/main/services/log-list.service')
-  const { exportAssetsExcel, exportReportExcel, downloadImportTemplate, importAssetsExcel } = await import(
+  const { exportAssetsExcel, exportAssetConfigExcel, exportReportExcel, downloadImportTemplate, importAssetsExcel } = await import(
     '../src/main/services/excel.service'
   )
   const { findSpecPreset, getEffectiveSpecFields } = await import('../src/shared/spec-presets')
   const { parseHardwareOutput } = await import('../src/main/services/hardware.service')
+  const { getInfrastructureOverview, updateInfrastructure } = await import(
+    '../src/main/services/infrastructure.service'
+  )
+  const {
+    listSystems,
+    saveSystem,
+    getSystem,
+    deleteSystem,
+    getSystemDashboard
+  } = await import('../src/main/services/system.service')
+  const { exportSystemsExcel, importSystemsExcel, downloadSystemImportTemplate } = await import(
+    '../src/main/services/system-report.service'
+  )
 
   openDatabase()
   const db = getDb()
@@ -344,6 +357,40 @@ async function main(): Promise<void> {
   if (savePath) {
     const exported = await exportAssetsExcel({ search: '' }, admin)
     if (exported.canceled || !existsSync(savePath)) throw new Error('Excel export failed')
+
+    const configPath = `${savePath}.config.xlsx`
+    process.env.MD_TEST_SAVE = configPath
+    const configExport = await exportAssetConfigExcel({ status: 'all' }, admin)
+    if (configExport.canceled || !existsSync(configPath)) {
+      throw new Error('Asset config export failed')
+    }
+    const configBook = new ExcelJS.Workbook()
+    await configBook.xlsx.readFile(configPath)
+    if (configBook.worksheets.length < 2) {
+      throw new Error('Asset config export should contain per-category sheets')
+    }
+    const configList = configBook.getWorksheet('Danh sách thiết bị')
+    if (!configList) throw new Error('Asset config export missing overview sheet')
+    const configHeaders = (configList.getRow(3).values as Array<unknown>).map((value) =>
+      String(value ?? '')
+    )
+    if (!configHeaders.includes('Cấu hình đầy đủ')) {
+      throw new Error('Asset config export missing full configuration column')
+    }
+    const categorySheets = configBook.worksheets.filter(
+      (item) => item.name !== 'Danh sách thiết bị'
+    )
+    const cpuSheet = categorySheets.find((item) =>
+      (item.getRow(3).values as Array<unknown>).some((value) => String(value ?? '') === 'CPU')
+    )
+    if (!cpuSheet) throw new Error('Asset config export missing category spec columns')
+    const cpuColumn = (cpuSheet.getRow(3).values as Array<unknown>).findIndex(
+      (value) => String(value ?? '') === 'CPU'
+    )
+    if (!String(cpuSheet.getRow(4).getCell(cpuColumn).value ?? '').trim()) {
+      throw new Error('Asset config export missing spec values')
+    }
+    process.env.MD_TEST_SAVE = savePath
     const templatePath = `${savePath}.template.xlsx`
     process.env.MD_TEST_SAVE = templatePath
     const template = await downloadImportTemplate(admin)
@@ -470,6 +517,211 @@ async function main(): Promise<void> {
   if (!disconnectedDrive.configured || disconnectedDrive.connected) {
     throw new Error('Drive disconnect failed')
   }
+
+  /* ------------------- Hạ tầng CNTT & hệ thống thông tin ------------------ */
+
+  const infraBefore = getInfrastructureOverview()
+  if (infraBefore.current.physicalServers !== 3 || infraBefore.current.firewalls !== 2) {
+    throw new Error('Seed infrastructure mismatch')
+  }
+  if (infraBefore.history.length < 2) throw new Error('Seed infrastructure history missing')
+  const infraUpdated = updateInfrastructure(
+    { physicalServers: 4, virtualServers: 13, switches: 15, firewalls: 2, note: 'Kiểm thử' },
+    admin
+  )
+  if (infraUpdated.current.physicalServers !== 4) throw new Error('Infrastructure update failed')
+  const infraChange = infraUpdated.history[0].changes.find(
+    (change) => change.field === 'physicalServers'
+  )
+  if (!infraChange || infraChange.before !== '3' || infraChange.after !== '4') {
+    throw new Error('Infrastructure change log failed')
+  }
+
+  const systemsBefore = listSystems({ pageSize: 100 })
+  if (systemsBefore.total < 10) throw new Error('Seed systems missing')
+
+  let rejectedLevelWithoutDecision = false
+  try {
+    saveSystem({ name: 'HTTT thiếu quyết định', managingUnit: 'Văn phòng', level: 3 }, admin)
+  } catch {
+    rejectedLevelWithoutDecision = true
+  }
+  if (!rejectedLevelWithoutDecision) {
+    throw new Error('Level without decision number should be rejected')
+  }
+
+  const createdSystem = saveSystem(
+    {
+      name: 'Hệ thống kiểm thử HTTT',
+      managingUnit: 'Văn phòng HĐND và UBND',
+      level: 2,
+      decisionNumber: 'TEST-QD-001',
+      decisionDate: '2024-01-15',
+      decisionAgency: 'UBND xã An Bình',
+      status: 'operating',
+      hostingType: 'virtual'
+    },
+    admin
+  ).system
+  if (!createdSystem.code.startsWith('HTTT-')) {
+    throw new Error(`Bad HTTT code: ${createdSystem.code}`)
+  }
+
+  let rejectedDuplicateDecision = false
+  try {
+    saveSystem(
+      {
+        name: 'HTTT trùng quyết định',
+        managingUnit: 'Văn phòng HĐND và UBND',
+        level: 2,
+        decisionNumber: 'TEST-QD-001'
+      },
+      admin
+    )
+  } catch {
+    rejectedDuplicateDecision = true
+  }
+  if (!rejectedDuplicateDecision) throw new Error('Duplicate decision number should be rejected')
+
+  const searched = listSystems({ search: 'kiểm thử HTTT', pageSize: 20 })
+  if (!searched.items.some((item) => item.id === createdSystem.id)) {
+    throw new Error('HTTT search failed')
+  }
+  const levelFiltered = listSystems({ level: 2, pageSize: 100 })
+  if (!levelFiltered.items.every((item) => item.level === 2)) {
+    throw new Error('HTTT level filter failed')
+  }
+
+  const systemDashboard = getSystemDashboard()
+  if (systemDashboard.kpis.total !== listSystems({ pageSize: 1000 }).total) {
+    throw new Error('HTTT dashboard total mismatch')
+  }
+  if (systemDashboard.kpis.approved < 1) throw new Error('HTTT approval count failed')
+
+  deleteSystem(createdSystem.id, admin)
+  const afterDelete = listSystems({ pageSize: 1000 })
+  if (afterDelete.items.some((item) => item.id === createdSystem.id)) {
+    throw new Error('Soft delete should hide system from list')
+  }
+  const deletedRow = db
+    .prepare('SELECT is_deleted FROM information_systems WHERE id = ?')
+    .get(createdSystem.id) as { is_deleted: number } | undefined
+  if (!deletedRow || !deletedRow.is_deleted) throw new Error('Soft delete flag missing')
+
+  /* --------------------- Phân bổ thiết bị cho phòng ban ------------------- */
+
+  const seededDepartmentAssets = listAssets({ allocationType: 'department', pageSize: 20 })
+  if (
+    seededDepartmentAssets.total < 1 ||
+    !seededDepartmentAssets.items.every((item) => item.allocationType === 'department')
+  ) {
+    throw new Error('Department allocation filter/seed failed')
+  }
+
+  const department = listDepartments()[0]
+  const deptAsset = createAsset(
+    {
+      name: 'Máy in phân bổ phòng ban',
+      categoryId: pcCategory.id,
+      status: 'in_use',
+      allocationType: 'department',
+      departmentId: department.id
+    },
+    admin
+  )
+  if (deptAsset.allocationType !== 'department') {
+    throw new Error('Department allocation type failed')
+  }
+  if (deptAsset.assignedEmployeeId !== null) {
+    throw new Error('Department allocation should not set employee')
+  }
+  const deptDetail = getAssetDetail(deptAsset.id)
+  if (deptDetail.departmentAssignments.length !== 1) {
+    throw new Error('Department assignment history missing')
+  }
+
+  const employeeAssignment = createAssignment(
+    {
+      assetId: deptAsset.id,
+      employeeId: employee.id,
+      assignedDate: new Date().toISOString().slice(0, 10),
+      note: 'Chuyển từ phòng ban sang nhân viên'
+    },
+    admin
+  )
+  const deptAfterEmployee = getAssetDetail(deptAsset.id)
+  if (deptAfterEmployee.asset.allocationType !== 'employee') {
+    throw new Error('Employee allocation should replace department allocation')
+  }
+  if (deptAfterEmployee.departmentAssignments.every((item) => item.status !== 'returned')) {
+    throw new Error('Department assignment should be closed')
+  }
+  returnAssignment(
+    {
+      assignmentId: employeeAssignment.id,
+      returnedDate: new Date().toISOString().slice(0, 10)
+    },
+    admin
+  )
+  if (getAssetDetail(deptAsset.id).asset.allocationType !== 'none') {
+    throw new Error('Return should reset allocation type')
+  }
+
+  /* ----------------------------- Excel HTTT ------------------------------ */
+
+  process.env.MD_TEST_SAVE = join(dataDir, 'systems-export.xlsx')
+  const systemsExport = await exportSystemsExcel({ level: 'all' }, admin)
+  if (systemsExport.canceled || !existsSync(join(dataDir, 'systems-export.xlsx'))) {
+    throw new Error('HTTT Excel export failed')
+  }
+  const exportedWorkbook = new ExcelJS.Workbook()
+  await exportedWorkbook.xlsx.readFile(join(dataDir, 'systems-export.xlsx'))
+  const listSheet = exportedWorkbook.getWorksheet('Danh sách HTTT')
+  if (!listSheet) throw new Error('HTTT export missing list sheet')
+  const exportedHeaders = (listSheet.getRow(3).values as Array<unknown>).map((value) =>
+    String(value ?? '')
+  )
+  for (const header of ['Cấp độ HTTT', 'Số quyết định phê duyệt', 'Đơn vị quản lý, vận hành']) {
+    if (!exportedHeaders.includes(header)) {
+      throw new Error(`HTTT export missing column: ${header}`)
+    }
+  }
+  const summarySheet = exportedWorkbook.getWorksheet('Tổng hợp hạ tầng')
+  if (!summarySheet) throw new Error('HTTT export missing infrastructure sheet')
+
+  process.env.MD_TEST_SAVE = join(dataDir, 'systems-template.xlsx')
+  const template = await downloadSystemImportTemplate(admin)
+  if (template.canceled || !existsSync(join(dataDir, 'systems-template.xlsx'))) {
+    throw new Error('HTTT template download failed')
+  }
+
+  const importFile = join(dataDir, 'systems-import.xlsx')
+  const importWorkbook = new ExcelJS.Workbook()
+  const importSheet = importWorkbook.addWorksheet('Danh sách HTTT')
+  importSheet.addRow([
+    'Mã HTTT',
+    'Tên hệ thống thông tin',
+    'Đơn vị quản lý, vận hành',
+    'Cấp độ HTTT',
+    'Số quyết định phê duyệt',
+    'Trạng thái'
+  ])
+  importSheet.addRow(['', 'HTTT nhập từ Excel', 'Văn phòng HĐND và UBND', '1', 'IMP-QD-001', 'Đang vận hành'])
+  importSheet.addRow(['', 'HTTT nhập lỗi cấp độ', 'Văn phòng HĐND và UBND', '3', '', 'Đang vận hành'])
+  await importWorkbook.xlsx.writeFile(importFile)
+  process.env.MD_TEST_IMPORT = importFile
+  const importResult = await importSystemsExcel(admin)
+  if (importResult.imported !== 1 || importResult.failed !== 1) {
+    throw new Error(
+      `HTTT import result mismatch: imported=${importResult.imported} failed=${importResult.failed} ${JSON.stringify(importResult.errors)}`
+    )
+  }
+  const importedSystem = listSystems({ search: 'HTTT nhập từ Excel', pageSize: 10 }).items[0]
+  if (!importedSystem || importedSystem.level !== 1) {
+    throw new Error('HTTT import did not persist data')
+  }
+
+  /* -------------------------------- Backup ------------------------------- */
 
   const previousSave = process.env.MD_TEST_SAVE
   const previousImport = process.env.MD_TEST_IMPORT

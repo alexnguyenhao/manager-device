@@ -105,6 +105,13 @@ export const SPEC_PRESETS: SpecPreset[] = [
         type: 'text',
         placeholder: 'Dell 24 inch'
       },
+      {
+        key: 'screenResolution',
+        label: 'Độ phân giải màn hình',
+        type: 'text',
+        placeholder: '1920 x 1080'
+      },
+      { key: 'refreshRate', label: 'Tần số quét', type: 'number', unit: 'Hz' },
       ...OS_FIELDS
     ]
   },
@@ -165,6 +172,13 @@ export const SPEC_PRESETS: SpecPreset[] = [
         unit: 'inch',
         placeholder: '14'
       },
+      {
+        key: 'screenResolution',
+        label: 'Độ phân giải màn hình',
+        type: 'text',
+        placeholder: '1920 x 1080'
+      },
+      { key: 'refreshRate', label: 'Tần số quét', type: 'number', unit: 'Hz' },
       {
         key: 'weight',
         label: 'Khối lượng',
@@ -270,7 +284,16 @@ export const SPEC_PRESETS: SpecPreset[] = [
         label: 'In màu',
         type: 'select',
         options: ['Có', 'Không']
-      }
+      },
+      {
+        key: 'duplex',
+        label: 'In hai mặt',
+        type: 'select',
+        options: ['Không', 'Có (trục dài)', 'Có (trục ngắn)']
+      },
+      { key: 'ipAddress', label: 'Địa chỉ IP', type: 'text', placeholder: '192.168.1.50' },
+      { key: 'driver', label: 'Driver máy in', type: 'text' },
+      { key: 'port', label: 'Cổng in', type: 'text', placeholder: 'IP_192.168.1.50' }
     ]
   },
   {

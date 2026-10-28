@@ -27,8 +27,10 @@ import {
   Package,
   Plus,
   RefreshCw,
+  ServerCog,
   ShieldAlert,
   ShieldCheck,
+  Network,
   Users,
   Wallet,
   Wrench
@@ -130,6 +132,7 @@ export function DashboardPage() {
   }
 
   const { kpis } = data
+  const systemSummary = data.systemSummary
   const statusTotal = data.byStatus.reduce((sum, item) => sum + item.count, 0)
   const today = new Intl.DateTimeFormat('vi-VN', {
     weekday: 'long',
@@ -215,6 +218,51 @@ export function DashboardPage() {
               </span>
             </span>
           }
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="section-title">Hạ tầng CNTT & hệ thống thông tin</h2>
+          <p className="mt-0.5 text-[11.5px] muted">
+            Số liệu phục vụ báo cáo, kiểm tra, thanh tra an toàn thông tin
+          </p>
+        </div>
+        <Link
+          to="/systems"
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+        >
+          Quản lý HTTT <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+      <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Tổng số HTTT"
+          value={formatNumber(systemSummary.total)}
+          icon={<ServerCog className="h-[18px] w-[18px]" />}
+          tone="teal"
+          hint={`${formatNumber(systemSummary.level3Plus)} HTTT từ cấp độ 3 trở lên`}
+        />
+        <StatCard
+          label="Đã phê duyệt cấp độ"
+          value={`${systemSummary.approvalRate}%`}
+          icon={<ShieldCheck className="h-[18px] w-[18px]" />}
+          tone="success"
+          hint={`${formatNumber(systemSummary.approved)} HTTT có cấp độ và số quyết định`}
+        />
+        <StatCard
+          label="Chưa xác định cấp độ"
+          value={formatNumber(systemSummary.unsetLevel)}
+          icon={<ShieldAlert className="h-[18px] w-[18px]" />}
+          tone="warning"
+          hint={`${formatNumber(systemSummary.warningCount)} HTTT cần bổ sung hồ sơ, quyết định`}
+        />
+        <StatCard
+          label="Thiết bị hạ tầng"
+          value={formatNumber(systemSummary.infrastructureTotal)}
+          icon={<Network className="h-[18px] w-[18px]" />}
+          tone="purple"
+          hint="Máy chủ vật lý, máy ảo, switch, firewall"
         />
       </div>
 

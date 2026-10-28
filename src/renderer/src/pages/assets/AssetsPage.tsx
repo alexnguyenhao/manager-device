@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeftRight,
   ArrowUpDown,
+  Building2,
   ChevronDown,
   Download,
   FileSpreadsheet,
@@ -21,6 +22,7 @@ import {
   Wrench
 } from 'lucide-react'
 import type {
+  AllocationType,
   Asset,
   AssetStatus,
   Category,
@@ -72,6 +74,7 @@ interface Filters {
   search: string
   categoryId: string
   status: 'all' | AssetStatus
+  allocationType: 'all' | AllocationType
   departmentId: string
   block: string
   locationId: string
@@ -82,6 +85,7 @@ const EMPTY_FILTERS: Filters = {
   search: '',
   categoryId: '',
   status: 'all',
+  allocationType: 'all',
   departmentId: '',
   block: '',
   locationId: '',
@@ -153,6 +157,7 @@ export function AssetsPage() {
         search: filters.search.trim() || undefined,
         categoryId: filters.categoryId ? Number(filters.categoryId) : null,
         status: filters.status,
+        allocationType: filters.allocationType,
         departmentId: filters.departmentId ? Number(filters.departmentId) : null,
         block: filters.block ? (filters.block as OrgBlock) : null,
         locationId: filters.locationId ? Number(filters.locationId) : null,
@@ -203,6 +208,7 @@ export function AssetsPage() {
     if (filters.search.trim()) count++
     if (filters.categoryId) count++
     if (filters.status !== 'all') count++
+    if (filters.allocationType !== 'all') count++
     if (filters.departmentId) count++
     if (filters.block) count++
     if (filters.locationId) count++
@@ -300,24 +306,52 @@ export function AssetsPage() {
     }
   }
 
+  const exportParams = (): {
+    search?: string
+    categoryId: number | null
+    status: Filters['status']
+    allocationType: Filters['allocationType']
+    departmentId: number | null
+    block: OrgBlock | null
+    locationId: number | null
+    warrantyExpiringDays: number | null
+    sortBy: typeof sortBy
+    sortDir: typeof sortDir
+  } => ({
+    search: filters.search.trim() || undefined,
+    categoryId: filters.categoryId ? Number(filters.categoryId) : null,
+    status: filters.status,
+    allocationType: filters.allocationType,
+    departmentId: filters.departmentId ? Number(filters.departmentId) : null,
+    block: filters.block ? (filters.block as OrgBlock) : null,
+    locationId: filters.locationId ? Number(filters.locationId) : null,
+    warrantyExpiringDays: filters.warranty ? 45 : null,
+    sortBy,
+    sortDir
+  })
+
   const exportExcel = async (): Promise<void> => {
     try {
-      const result: ExportResult = await api.assets.exportExcel({
-        search: filters.search.trim() || undefined,
-        categoryId: filters.categoryId ? Number(filters.categoryId) : null,
-        status: filters.status,
-        departmentId: filters.departmentId ? Number(filters.departmentId) : null,
-        block: filters.block ? (filters.block as OrgBlock) : null,
-        locationId: filters.locationId ? Number(filters.locationId) : null,
-        warrantyExpiringDays: filters.warranty ? 45 : null,
-        sortBy,
-        sortDir
-      })
+      const result: ExportResult = await api.assets.exportExcel(exportParams())
       if (!result.canceled && result.filePath) {
         toast.success('Đã xuất Excel', `Đã lưu ${result.count ?? 0} thiết bị vào tệp.`)
       }
     } catch (error) {
       toast.error('Không thể xuất Excel', errorMessage(error))
+    }
+  }
+
+  const exportConfigExcel = async (): Promise<void> => {
+    try {
+      const result: ExportResult = await api.assets.exportConfigExcel(exportParams())
+      if (!result.canceled && result.filePath) {
+        toast.success(
+          'Đã xuất danh sách kèm cấu hình',
+          `Đã lưu ${result.count ?? 0} thiết bị, mỗi danh mục một sheet.`
+        )
+      }
+    } catch (error) {
+      toast.error('Không thể xuất cấu hình thiết bị', errorMessage(error))
     }
   }
 
@@ -402,6 +436,11 @@ export function AssetsPage() {
                       onClick: () => void exportExcel()
                     },
                     {
+                      label: 'Xuất kèm cấu hình đầy đủ',
+                      icon: <FileSpreadsheet className="h-4 w-4" />,
+                      onClick: () => void exportConfigExcel()
+                    },
+                    {
                       label: 'Tải tệp mẫu',
                       icon: <FileSpreadsheet className="h-4 w-4" />,
                       onClick: () => void downloadTemplate(),
@@ -482,6 +521,22 @@ export function AssetsPage() {
                   {ASSET_STATUS_META[status].label}
                 </option>
               ))}
+            </Select>
+            <Select
+              value={filters.allocationType}
+              onChange={(event) => {
+                setFilters((prev) => ({
+                  ...prev,
+                  allocationType: event.target.value as Filters['allocationType']
+                }))
+                setPage(1)
+              }}
+              aria-label="Lọc theo hình thức phân bổ"
+            >
+              <option value="all">Mọi hình thức phân bổ</option>
+              <option value="employee">Giao cho nhân viên</option>
+              <option value="department">Phân bổ cho phòng ban</option>
+              <option value="none">Chưa phân bổ</option>
             </Select>
             <Select
               value={filters.departmentId}
@@ -626,7 +681,7 @@ export function AssetsPage() {
                   </th>
                   <th>Danh mục</th>
                   <th>Trạng thái</th>
-                  <th>Người sử dụng</th>
+                  <th>Người sử dụng / Phòng ban</th>
                   <th>Vị trí</th>
                   <th>
                     <button
@@ -763,7 +818,18 @@ export function AssetsPage() {
                         </p>
                       </td>
                       <td>
-                        {asset.assignedEmployeeName ? (
+                        {asset.allocationType === 'department' ? (
+                          <>
+                            <p className="flex items-center gap-1.5 text-[12px] font-medium text-teal-700 dark:text-teal-400">
+                              <Building2 className="h-3.5 w-3.5" />
+                              {asset.departmentName ?? 'Phòng ban'}
+                            </p>
+                            <p className="text-[10.5px] text-slate-400">
+                              Phân bổ cho phòng ban
+                              {asset.allocatedAt ? ` · ${formatDate(asset.allocatedAt)}` : ''}
+                            </p>
+                          </>
+                        ) : asset.assignedEmployeeName ? (
                           <>
                             <p className="text-[12px] font-medium text-slate-700 dark:text-slate-200">
                               {asset.assignedEmployeeName}
@@ -771,7 +837,7 @@ export function AssetsPage() {
                             <p className="text-[10.5px] text-slate-400">{asset.departmentName ?? '—'}</p>
                           </>
                         ) : (
-                          <span className="text-[12px] text-slate-400">Chưa cấp phát</span>
+                          <span className="text-[12px] text-slate-400">Chưa phân bổ</span>
                         )}
                       </td>
                       <td>

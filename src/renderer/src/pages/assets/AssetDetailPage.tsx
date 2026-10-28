@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ArrowLeftRight,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -333,7 +334,7 @@ export function AssetDetailPage() {
                 onChange={setTab}
                 items={[
                   { value: 'overview', label: 'Tổng quan' },
-                  { value: 'assignments', label: 'Cấp phát', count: detail.assignments.length },
+                  { value: 'assignments', label: 'Cấp phát', count: detail.assignments.length + detail.departmentAssignments.length },
                   { value: 'maintenance', label: 'Bảo trì', count: detail.maintenance.length },
                   { value: 'files', label: 'Tệp đính kèm', count: detail.attachments.length },
                   { value: 'logs', label: 'Lịch sử', count: detail.logs.length }
@@ -362,15 +363,30 @@ export function AssetDetailPage() {
                       />
                       <InfoRow label="Vị trí" value={asset.locationName} />
                       <InfoRow
+                        label="Hình thức phân bổ"
+                        value={
+                          asset.allocationType === 'department'
+                            ? 'Phân bổ cho phòng ban'
+                            : asset.allocationType === 'employee'
+                              ? 'Giao cho nhân viên'
+                              : 'Chưa phân bổ'
+                        }
+                      />
+                      <InfoRow
                         label="Người sử dụng"
                         value={
-                          asset.assignedEmployeeName ? (
+                          asset.allocationType === 'department' ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Building2 className="h-3 w-3 text-slate-400" />
+                              {asset.departmentName ?? 'Phòng ban'} (phòng ban)
+                            </span>
+                          ) : asset.assignedEmployeeName ? (
                             <span className="inline-flex items-center gap-1">
                               <UserRound className="h-3 w-3 text-slate-400" />
                               {asset.assignedEmployeeName}
                             </span>
                           ) : (
-                            'Chưa cấp phát'
+                            'Chưa phân bổ'
                           )
                         }
                       />
@@ -443,14 +459,47 @@ export function AssetDetailPage() {
 
               {tab === 'assignments' && (
                 <div>
-                  {detail.assignments.length === 0 ? (
+                  {detail.departmentAssignments.length > 0 && (
+                    <div className="mb-3">
+                      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                        <Building2 className="h-3.5 w-3.5" /> Phân bổ cho phòng ban
+                      </p>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {detail.departmentAssignments.map((assignment) => (
+                          <div key={assignment.id} className="flex flex-wrap items-center gap-3 py-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+                              <Building2 className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12.5px] font-medium text-slate-800 dark:text-slate-100">
+                                {assignment.departmentName}
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                Phân bổ từ {formatDate(assignment.assignedDate)}
+                                {assignment.returnedDate
+                                  ? ` → ${formatDate(assignment.returnedDate)}`
+                                  : ''}
+                                {assignment.createdByName ? ` · ${assignment.createdByName}` : ''}
+                              </p>
+                            </div>
+                            {assignment.status === 'active' ? (
+                              <Badge tone="teal">Đang được phòng ban sử dụng</Badge>
+                            ) : (
+                              <Badge tone="neutral">Đã thu hồi</Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {detail.assignments.length === 0 && detail.departmentAssignments.length === 0 ? (
                     <EmptyState
                       icon={<ArrowLeftRight className="h-5 w-5" />}
                       title="Chưa có lịch sử cấp phát"
-                      description="Thiết bị chưa được bàn giao cho nhân viên nào."
+                      description="Thiết bị chưa được bàn giao cho nhân viên hoặc phòng ban nào."
                       className="py-8"
                     />
-                  ) : (
+                  ) : detail.assignments.length > 0 ? (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {detail.assignments.map((assignment) => (
                         <div key={assignment.id} className="flex flex-wrap items-center gap-3 py-3">
@@ -478,7 +527,7 @@ export function AssetDetailPage() {
                         </div>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                   <div className="mt-3">
                     <Button
                       variant="outline"

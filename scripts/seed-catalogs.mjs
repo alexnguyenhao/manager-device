@@ -85,6 +85,13 @@ const CATEGORIES = [
       { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
       { key: 'monitor', label: 'Màn hình', type: 'text' },
       {
+        key: 'screenResolution',
+        label: 'Độ phân giải màn hình',
+        type: 'text',
+        placeholder: '1920 x 1080'
+      },
+      { key: 'refreshRate', label: 'Tần số quét', type: 'number', unit: 'Hz' },
+      {
         key: 'os',
         label: 'Hệ điều hành',
         type: 'select',
@@ -128,6 +135,13 @@ const CATEGORIES = [
       { key: 'gpu', label: 'Card đồ họa (GPU)', type: 'text', placeholder: 'Intel Iris Xe' },
       { key: 'gpuMemory', label: 'Bộ nhớ GPU', type: 'text', placeholder: '4GB hoặc Chia sẻ' },
       { key: 'screen', label: 'Kích thước màn hình', type: 'text', unit: 'inch' },
+      {
+        key: 'screenResolution',
+        label: 'Độ phân giải màn hình',
+        type: 'text',
+        placeholder: '1920 x 1080'
+      },
+      { key: 'refreshRate', label: 'Tần số quét', type: 'number', unit: 'Hz' },
       {
         key: 'os',
         label: 'Hệ điều hành',
@@ -174,7 +188,16 @@ const CATEGORIES = [
         type: 'select',
         options: ['USB', 'LAN', 'Wi-Fi', 'USB + LAN', 'USB + LAN + Wi-Fi']
       },
-      { key: 'color', label: 'In màu', type: 'select', options: ['Có', 'Không'] }
+      { key: 'color', label: 'In màu', type: 'select', options: ['Có', 'Không'] },
+      {
+        key: 'duplex',
+        label: 'In hai mặt',
+        type: 'select',
+        options: ['Không', 'Có (trục dài)', 'Có (trục ngắn)']
+      },
+      { key: 'ipAddress', label: 'Địa chỉ IP', type: 'text', placeholder: '192.168.1.50' },
+      { key: 'driver', label: 'Driver máy in', type: 'text' },
+      { key: 'port', label: 'Cổng in', type: 'text', placeholder: 'IP_192.168.1.50' }
     ]
   },
   {
@@ -299,16 +322,23 @@ db.exec('PRAGMA busy_timeout = 5000')
 
 /** Vị trí chèn trường mới để giữ thứ tự hiển thị hợp lý. */
 const FIELD_ANCHORS = {
-  cpuCores: 'cpu',
-  cpuThreads: 'cpuCores',
-  ramBus: 'ramType',
-  gpuMemory: 'gpu'
+  cpuCores: ['cpu'],
+  cpuThreads: ['cpuCores'],
+  ramBus: ['ramType'],
+  gpuMemory: ['gpu'],
+  screenResolution: ['screen', 'monitor'],
+  refreshRate: ['screenResolution'],
+  duplex: ['color'],
+  ipAddress: ['connection']
 }
 
 function findInsertIndex(schema, key) {
-  const anchor = FIELD_ANCHORS[key]
-  const index = anchor ? schema.findIndex((field) => field && field.key === anchor) : -1
-  return index >= 0 ? index + 1 : schema.length
+  const anchors = FIELD_ANCHORS[key] || []
+  for (const anchor of anchors) {
+    const index = schema.findIndex((field) => field && field.key === anchor)
+    if (index >= 0) return index + 1
+  }
+  return schema.length
 }
 
 function recordsLabel(row) {

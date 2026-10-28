@@ -1,4 +1,5 @@
 import type {
+  AllocationType,
   Asset,
   AssetAttachment,
   AssetDetail,
@@ -6,6 +7,7 @@ import type {
   AssetListParams,
   AssetStatus,
   AuthUser,
+  DepartmentAssignment,
   PageResult
 } from '../../shared/types'
 import {
@@ -33,7 +35,10 @@ const ASSET_SELECT = `
          d.name AS department_name, d.block AS department_block,
          l.name AS location_name,
          e.full_name AS assigned_employee_name, s.name AS supplier_name,
-         u.full_name AS created_by_name
+         u.full_name AS created_by_name,
+         (SELECT da.assigned_date FROM department_assignments da
+           WHERE da.asset_id = a.id AND da.status = 'active'
+           ORDER BY da.id DESC LIMIT 1) AS allocated_at
   FROM assets a
   JOIN categories c ON c.id = a.category_id
   LEFT JOIN departments d ON d.id = a.department_id
@@ -62,6 +67,8 @@ export interface AssetRow {
   location_name: string | null
   assigned_employee_id: number | null
   assigned_employee_name: string | null
+  allocation_type: AllocationType
+  allocated_at: string | null
   supplier_id: number | null
   supplier_name: string | null
   purchase_date: string | null
@@ -126,6 +133,8 @@ export function mapAsset(row: AssetRow): Asset {
     locationName: row.location_name,
     assignedEmployeeId: row.assigned_employee_id ? Number(row.assigned_employee_id) : null,
     assignedEmployeeName: row.assigned_employee_name,
+    allocationType: (row.allocation_type as AllocationType) ?? 'none',
+    allocatedAt: row.allocated_at ?? null,
     supplierId: row.supplier_id ? Number(row.supplier_id) : null,
     supplierName: row.supplier_name,
     purchaseDate: row.purchase_date,
@@ -203,6 +212,10 @@ function buildWhere(params: AssetListParams): { sql: string; values: Array<strin
   if (params.assignedEmployeeId) {
     where.push('a.assigned_employee_id = ?')
     values.push(params.assignedEmployeeId)
+  }
+  if (params.allocationType && params.allocationType !== 'all') {
+    where.push('a.allocation_type = ?')
+    values.push(params.allocationType)
   }
   if (params.ids && params.ids.length > 0) {
     where.push(`a.id IN (${params.ids.map(() => '?').join(',')})`)
@@ -305,6 +318,7 @@ export function getAssetDetail(id: number): AssetDetail {
     asset,
     attachments,
     assignments,
+    departmentAssignments: listDepartmentAssignments(id),
     maintenance,
     logs: logs.map((log) => ({
       id: Number(log.id),
@@ -403,6 +417,112 @@ function validateDates(input: AssetInput): void {
   }
 }
 
+/* ---------------------- Department-level allocation --------------------- */
+
+interface ActiveDepartmentAssignment {
+  id: number
+  asset_id: number
+  department_id: number
+}
+
+export function listDepartmentAssignments(assetId: number): DepartmentAssignment[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT da.*, d.name AS department_name, u.full_name AS created_by_name
+       FROM department_assignments da
+       JOIN departments d ON d.id = da.department_id
+       LEFT JOIN users u ON u.id = da.created_by
+       WHERE da.asset_id = ? ORDER BY da.id DESC`
+    )
+    .all(assetId) as Array<{
+    id: number
+    asset_id: number
+    department_id: number
+    department_name: string
+    assigned_date: string
+    returned_date: string | null
+    status: 'active' | 'returned'
+    note: string | null
+    return_note: string | null
+    created_by_name: string | null
+    created_at: string
+  }>
+  return rows.map((row) => ({
+    id: Number(row.id),
+    assetId: Number(row.asset_id),
+    departmentId: Number(row.department_id),
+    departmentName: row.department_name,
+    assignedDate: row.assigned_date,
+    returnedDate: row.returned_date,
+    status: row.status,
+    note: row.note,
+    returnNote: row.return_note,
+    createdByName: row.created_by_name,
+    createdAt: row.created_at
+  }))
+}
+
+function getActiveDepartmentAssignment(assetId: number): ActiveDepartmentAssignment | undefined {
+  return getDb()
+    .prepare(
+      `SELECT id, asset_id, department_id FROM department_assignments
+       WHERE asset_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1`
+    )
+    .get(assetId) as ActiveDepartmentAssignment | undefined
+}
+
+function insertDepartmentAssignment(input: {
+  assetId: number
+  departmentId: number
+  assignedDate: string
+  note: string | null
+  userId: number
+}): number {
+  const result = getDb()
+    .prepare(
+      `INSERT INTO department_assignments
+        (asset_id, department_id, assigned_date, returned_date, status, note, created_by, created_at)
+       VALUES (?, ?, ?, NULL, 'active', ?, ?, ?)`
+    )
+    .run(
+      input.assetId,
+      input.departmentId,
+      input.assignedDate,
+      input.note,
+      input.userId,
+      nowISO()
+    )
+  return Number(result.lastInsertRowid)
+}
+
+function closeActiveDepartmentAssignments(
+  assetId: number,
+  returnedDate: string,
+  returnNote: string | null
+): void {
+  getDb()
+    .prepare(
+      `UPDATE department_assignments
+       SET status = 'returned', returned_date = ?, return_note = ?
+       WHERE asset_id = ? AND status = 'active'`
+    )
+    .run(returnedDate, returnNote, assetId)
+}
+
+function normalizeAllocationType(
+  requested: AllocationType | undefined,
+  employeeId: number | null,
+  existing?: { allocation_type: AllocationType; assigned_employee_id: number | null }
+): AllocationType {
+  if (requested === 'department') return 'department'
+  if (requested === 'employee') return employeeId ? 'employee' : 'none'
+  if (requested === 'none') return employeeId ? 'employee' : 'none'
+  if (employeeId) return 'employee'
+  if (existing?.allocation_type === 'department') return 'department'
+  if (existing?.assigned_employee_id) return 'employee'
+  return 'none'
+}
+
 export function createAsset(input: AssetInput, user: AuthUser): Asset {
   const db = getDb()
   validateDates(input)
@@ -411,26 +531,49 @@ export function createAsset(input: AssetInput, user: AuthUser): Asset {
   const exists = db.prepare('SELECT id FROM assets WHERE code = ?').get(code)
   if (exists) throw conflict(`Mã thiết bị "${code}" đã tồn tại.`)
 
-  let status: AssetStatus = input.status ?? (input.assignedEmployeeId ? 'in_use' : 'available')
+  let status: AssetStatus =
+    input.status ??
+    (input.allocationType === 'department' || input.assignedEmployeeId ? 'in_use' : 'available')
   let employeeId = input.assignedEmployeeId ?? null
   let departmentId = input.departmentId ?? null
   let employee: ReturnType<typeof employeeInfo> | null = null
+  let allocationType = normalizeAllocationType(input.allocationType, employeeId)
 
-  if (employeeId) {
+  if (allocationType === 'employee' && employeeId) {
     employee = employeeInfo(employeeId)
     if (!departmentId) departmentId = employee.department_id ? Number(employee.department_id) : null
   }
-  if (status === 'in_use' && !employeeId) {
-    throw conflict('Vui lòng chọn người sử dụng khi thiết bị ở trạng thái "Đang sử dụng".')
+  if (allocationType === 'department') {
+    if (!departmentId) {
+      throw conflict('Vui lòng chọn phòng ban, đơn vị khi phân bổ thiết bị cho phòng ban.')
+    }
+    const department = db
+      .prepare('SELECT id, name, is_active FROM departments WHERE id = ?')
+      .get(departmentId) as { id: number; name: string; is_active: number } | undefined
+    if (!department) throw notFound('phòng ban, đơn vị')
+    if (!Number(department.is_active)) {
+      throw conflict('Phòng ban đã ngừng sử dụng, không thể phân bổ thiết bị.')
+    }
+    employeeId = null
+    employee = null
+    if (status !== 'maintenance') status = 'in_use'
+  }
+  if (status === 'in_use' && allocationType === 'none') {
+    throw conflict(
+      'Vui lòng chọn người sử dụng hoặc phòng ban được phân bổ khi thiết bị ở trạng thái "Đang sử dụng".'
+    )
   }
   if (status !== 'in_use' && status !== 'maintenance') {
     employeeId = null
+    allocationType = 'none'
   }
   if (status === 'maintenance' && employeeId && !input.assignedEmployeeId) {
     employeeId = null
+    allocationType = 'none'
   }
   if (status === 'disposed' || status === 'lost' || status === 'available' || status === 'reserved') {
     employeeId = null
+    allocationType = 'none'
   }
 
   const warrantyMonths = input.warrantyMonths ?? Number(category.default_warranty_months) ?? 0
@@ -446,10 +589,10 @@ export function createAsset(input: AssetInput, user: AuthUser): Asset {
       .prepare(
         `INSERT INTO assets
           (code, name, category_id, serial_number, model, manufacturer, status, condition,
-           department_id, location_id, assigned_employee_id, supplier_id,
+           department_id, location_id, assigned_employee_id, allocation_type, supplier_id,
            purchase_date, purchase_price, invoice_number, warranty_start, warranty_months, warranty_expiry,
            depreciation_months, salvage_value, specs, note, image_path, search_text, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`
       )
       .run(
         code,
@@ -463,6 +606,7 @@ export function createAsset(input: AssetInput, user: AuthUser): Asset {
         departmentId,
         input.locationId ?? null,
         employeeId,
+        allocationType,
         input.supplierId ?? null,
         input.purchaseDate ?? null,
         input.purchasePrice ?? 0,
@@ -481,7 +625,7 @@ export function createAsset(input: AssetInput, user: AuthUser): Asset {
       )
     assetId = Number(result.lastInsertRowid)
 
-    if (status === 'in_use' && employeeId) {
+    if (allocationType === 'employee' && status === 'in_use' && employeeId) {
       insertAssignment({
         assetId,
         employeeId,
@@ -490,6 +634,15 @@ export function createAsset(input: AssetInput, user: AuthUser): Asset {
         expectedReturnDate: null,
         conditionBefore: input.condition ?? 'good',
         note: 'Cấp phát khi tạo thiết bị',
+        userId: user.id
+      })
+    }
+    if (allocationType === 'department' && departmentId) {
+      insertDepartmentAssignment({
+        assetId,
+        departmentId,
+        assignedDate: todayISO(),
+        note: 'Phân bổ cho phòng ban khi tạo thiết bị',
         userId: user.id
       })
     }
@@ -502,66 +655,81 @@ export function createAsset(input: AssetInput, user: AuthUser): Asset {
     'asset',
     assetId,
     `${code} - ${input.name}`,
-    `Danh mục: ${category.prefix}${employee ? `, nhân viên: ${employee.full_name}` : ''}`
+    `Danh mục: ${category.prefix}${employee ? `, nhân viên: ${employee.full_name}` : ''}${
+      allocationType === 'department' ? ', phân bổ cho phòng ban' : ''
+    }`
   )
   return getAssetDetail(assetId).asset
 }
 
 interface UpdateAssignmentPlan {
-  closeActive: boolean
-  createFor: number | null
+  closeEmployeeAssignment: boolean
+  createEmployeeFor: number | null
+  closeDepartmentAssignment: boolean
+  createDepartmentFor: number | null
   employeeId: number | null
   departmentId: number | null
+  allocationType: AllocationType
 }
 
 function planAssignments(
   existing: AssetRow,
   status: AssetStatus,
+  allocationType: AllocationType,
   employeeId: number | null,
-  departmentId: number | null,
-  condition: Asset['condition']
+  departmentId: number | null
 ): UpdateAssignmentPlan {
-  const active = getActiveAssignment(Number(existing.id))
+  const activeEmployee = getActiveAssignment(Number(existing.id))
+  const activeDepartment = getActiveDepartmentAssignment(Number(existing.id))
   const plan: UpdateAssignmentPlan = {
-    closeActive: false,
-    createFor: null,
+    closeEmployeeAssignment: false,
+    createEmployeeFor: null,
+    closeDepartmentAssignment: false,
+    createDepartmentFor: null,
     employeeId,
-    departmentId
+    departmentId,
+    allocationType
   }
 
   if (status === 'available' || status === 'disposed' || status === 'lost' || status === 'reserved') {
-    plan.closeActive = Boolean(active)
+    plan.closeEmployeeAssignment = Boolean(activeEmployee)
+    plan.closeDepartmentAssignment = Boolean(activeDepartment)
     plan.employeeId = null
+    plan.allocationType = 'none'
     return plan
   }
 
-  if (status === 'maintenance') {
-    if (!active) {
-      plan.employeeId = null
-      return plan
+  if (allocationType === 'department') {
+    plan.closeEmployeeAssignment = Boolean(activeEmployee)
+    plan.employeeId = null
+    if (!departmentId) return plan
+    if (!activeDepartment) {
+      plan.createDepartmentFor = departmentId
+    } else if (Number(activeDepartment.department_id) !== Number(departmentId)) {
+      plan.closeDepartmentAssignment = true
+      plan.createDepartmentFor = departmentId
     }
-    if (employeeId === null || Number(active.employeeId) !== Number(employeeId)) {
-      plan.closeActive = true
-      plan.employeeId = null
-      return plan
-    }
-    plan.employeeId = Number(employeeId)
     return plan
   }
 
-  // in_use
-  if (employeeId === null) {
-    plan.closeActive = Boolean(active)
+  // Mọi hình thức khác đều thu hồi phân bổ phòng ban đang mở.
+  plan.closeDepartmentAssignment = Boolean(activeDepartment)
+
+  if (allocationType === 'none' || employeeId === null) {
+    plan.closeEmployeeAssignment = Boolean(activeEmployee)
+    plan.employeeId = null
+    plan.allocationType = 'none'
     return plan
   }
 
-  if (!active) {
-    plan.createFor = employeeId
-  } else if (Number(active.employeeId) !== Number(employeeId)) {
-    plan.closeActive = true
-    plan.createFor = employeeId
+  if (!activeEmployee) {
+    plan.createEmployeeFor = employeeId
+  } else if (Number(activeEmployee.employeeId) !== Number(employeeId)) {
+    plan.closeEmployeeAssignment = true
+    plan.createEmployeeFor = employeeId
   }
   plan.employeeId = employeeId
+  plan.allocationType = 'employee'
 
   if (!departmentId) {
     const employee = getDb()
@@ -569,7 +737,6 @@ function planAssignments(
       .get(employeeId) as { department_id: number | null } | undefined
     plan.departmentId = employee?.department_id ? Number(employee.department_id) : null
   }
-  void condition
   return plan
 }
 
@@ -584,17 +751,57 @@ export function updateAsset(id: number, input: AssetInput, user: AuthUser): Asse
   const duplicate = getDb().prepare('SELECT id FROM assets WHERE code = ? AND id <> ?').get(code, id)
   if (duplicate) throw conflict(`Mã thiết bị "${code}" đã tồn tại.`)
 
-  const status: AssetStatus = input.status ?? existing.status
+  let status: AssetStatus = input.status ?? existing.status
   let employeeId = input.assignedEmployeeId ?? null
+  let departmentId = input.departmentId ?? (existing.department_id ? Number(existing.department_id) : null)
   let employee: ReturnType<typeof employeeInfo> | null = null
   const currentEmployeeId = existing.assigned_employee_id
     ? Number(existing.assigned_employee_id)
     : null
-  if (employeeId) {
-    employee = employeeInfo(employeeId, currentEmployeeId === employeeId)
+  let allocationType = normalizeAllocationType(input.allocationType, employeeId, {
+    allocation_type: (existing.allocation_type as AllocationType) ?? 'none',
+    assigned_employee_id: currentEmployeeId
+  })
+
+  if (allocationType === 'employee') {
+    if (!employeeId) {
+      if (status === 'in_use') {
+        throw conflict('Vui lòng chọn người sử dụng khi thiết bị ở trạng thái "Đang sử dụng".')
+      }
+      allocationType = 'none'
+    } else {
+      employee = employeeInfo(employeeId, currentEmployeeId === employeeId)
+      if (!departmentId) {
+        departmentId = employee.department_id ? Number(employee.department_id) : null
+      }
+    }
   }
-  if (status === 'in_use' && !employeeId) {
-    throw conflict('Vui lòng chọn người sử dụng khi thiết bị ở trạng thái "Đang sử dụng".')
+
+  if (allocationType === 'department') {
+    if (!departmentId) {
+      throw conflict('Vui lòng chọn phòng ban, đơn vị khi phân bổ thiết bị cho phòng ban.')
+    }
+    const department = getDb()
+      .prepare('SELECT id, is_active FROM departments WHERE id = ?')
+      .get(departmentId) as { id: number; is_active: number } | undefined
+    if (!department) throw notFound('phòng ban, đơn vị')
+    const isCurrentDepartment = Number(existing.department_id) === Number(departmentId)
+    if (!Number(department.is_active) && !isCurrentDepartment) {
+      throw conflict('Phòng ban đã ngừng sử dụng, không thể phân bổ thiết bị.')
+    }
+    employeeId = null
+    employee = null
+    if (status !== 'maintenance') status = 'in_use'
+  }
+
+  if (status === 'in_use' && allocationType === 'none') {
+    throw conflict(
+      'Vui lòng chọn người sử dụng hoặc phòng ban được phân bổ khi thiết bị ở trạng thái "Đang sử dụng".'
+    )
+  }
+  if (status !== 'in_use' && status !== 'maintenance') {
+    employeeId = null
+    allocationType = 'none'
   }
 
   const warrantyMonths = input.warrantyMonths ?? Number(existing.warranty_months) ?? 0
@@ -602,12 +809,12 @@ export function updateAsset(id: number, input: AssetInput, user: AuthUser): Asse
   const warrantyStart = input.warrantyStart ?? input.purchaseDate ?? existing.warranty_start
   const warrantyExpiry = addMonths(warrantyStart, warrantyMonths)
   const condition = input.condition ?? existing.condition
-  const plan = planAssignments(existing, status, employeeId, input.departmentId ?? null, condition)
+  const plan = planAssignments(existing, status, allocationType, employeeId, departmentId)
   employeeId = plan.employeeId
   const now = nowISO()
 
   transaction(() => {
-    if (plan.closeActive) {
+    if (plan.closeEmployeeAssignment) {
       closeActiveAssignments(
         id,
         todayISO(),
@@ -615,15 +822,31 @@ export function updateAsset(id: number, input: AssetInput, user: AuthUser): Asse
         'Thu hồi tự động khi cập nhật trạng thái thiết bị'
       )
     }
-    if (plan.createFor) {
+    if (plan.closeDepartmentAssignment) {
+      closeActiveDepartmentAssignments(
+        id,
+        todayISO(),
+        'Thu hồi tự động khi cập nhật hình thức phân bổ'
+      )
+    }
+    if (plan.createEmployeeFor) {
       insertAssignment({
         assetId: id,
-        employeeId: plan.createFor,
+        employeeId: plan.createEmployeeFor,
         departmentId: plan.departmentId,
         assignedDate: todayISO(),
         expectedReturnDate: null,
         conditionBefore: condition,
         note: 'Cấp phát khi cập nhật thiết bị',
+        userId: user.id
+      })
+    }
+    if (plan.createDepartmentFor) {
+      insertDepartmentAssignment({
+        assetId: id,
+        departmentId: plan.createDepartmentFor,
+        assignedDate: todayISO(),
+        note: 'Phân bổ cho phòng ban khi cập nhật thiết bị',
         userId: user.id
       })
     }
@@ -633,7 +856,7 @@ export function updateAsset(id: number, input: AssetInput, user: AuthUser): Asse
         `UPDATE assets SET
           code = ?, name = ?, category_id = ?, serial_number = ?, model = ?, manufacturer = ?,
           status = ?, condition = ?, department_id = ?, location_id = ?, assigned_employee_id = ?,
-          supplier_id = ?, purchase_date = ?, purchase_price = ?, invoice_number = ?,
+          allocation_type = ?, supplier_id = ?, purchase_date = ?, purchase_price = ?, invoice_number = ?,
           warranty_start = ?, warranty_months = ?, warranty_expiry = ?, depreciation_months = ?,
           salvage_value = ?, specs = ?, note = ?, image_path = ?, updated_at = ?
          WHERE id = ?`
@@ -650,6 +873,7 @@ export function updateAsset(id: number, input: AssetInput, user: AuthUser): Asse
         plan.departmentId,
         input.locationId ?? null,
         employeeId,
+        plan.allocationType,
         input.supplierId ?? null,
         input.purchaseDate ?? null,
         input.purchasePrice ?? 0,
@@ -676,6 +900,16 @@ export function updateAsset(id: number, input: AssetInput, user: AuthUser): Asse
   if (Number(existing.assigned_employee_id ?? 0) !== Number(employeeId ?? 0)) {
     changes.push(`người sử dụng: ${existing.assigned_employee_name ?? 'Không'} → ${employee?.full_name ?? 'Không'}`)
   }
+  const previousAllocation = (existing.allocation_type as AllocationType) ?? 'none'
+  if (previousAllocation !== plan.allocationType) {
+    changes.push(`hình thức phân bổ: ${previousAllocation} → ${plan.allocationType}`)
+  }
+  if (previousAllocation === 'department' && plan.allocationType === 'department') {
+    const previousDepartment = existing.department_id ? Number(existing.department_id) : null
+    if (previousDepartment !== (plan.departmentId ? Number(plan.departmentId) : null)) {
+      changes.push(`phòng ban được phân bổ: ${existing.department_name ?? 'Không'} → ${plan.departmentId ?? 'Không'}`)
+    }
+  }
   logActivity(
     user,
     'Cập nhật thiết bị',
@@ -696,16 +930,26 @@ export function updateAssetStatus(
   const existing = getAssetRow(id)
   if (existing.status === status) return mapAsset(existing)
 
-  if (status === 'in_use' && !getActiveAssignment(id) && !existing.assigned_employee_id) {
-    throw conflict('Vui lòng cấp phát thiết bị cho nhân viên trước khi chuyển sang trạng thái đang sử dụng.')
+  if (
+    status === 'in_use' &&
+    !getActiveAssignment(id) &&
+    !existing.assigned_employee_id &&
+    existing.allocation_type !== 'department'
+  ) {
+    throw conflict(
+      'Vui lòng cấp phát hoặc phân bổ thiết bị cho phòng ban trước khi chuyển sang trạng thái đang sử dụng.'
+    )
   }
 
   const now = nowISO()
   transaction(() => {
     if (status === 'available' || status === 'disposed' || status === 'lost' || status === 'reserved') {
       closeActiveAssignments(id, todayISO(), existing.condition, note || 'Thu hồi khi chuyển trạng thái')
+      closeActiveDepartmentAssignments(id, todayISO(), note || 'Thu hồi khi chuyển trạng thái')
       getDb()
-        .prepare("UPDATE assets SET status = ?, assigned_employee_id = NULL, updated_at = ? WHERE id = ?")
+        .prepare(
+          "UPDATE assets SET status = ?, assigned_employee_id = NULL, allocation_type = 'none', updated_at = ? WHERE id = ?"
+        )
         .run(status, now, id)
     } else {
       getDb().prepare('UPDATE assets SET status = ?, updated_at = ? WHERE id = ?').run(status, now, id)
@@ -728,6 +972,11 @@ export function deleteAsset(id: number, user: AuthUser): void {
   const existing = getAssetRow(id)
   if (getActiveAssignment(id)) {
     throw conflict('Thiết bị đang được cấp phát. Vui lòng thu hồi trước khi xóa.')
+  }
+  if (getActiveDepartmentAssignment(id)) {
+    throw conflict(
+      'Thiết bị đang được phân bổ cho phòng ban. Vui lòng thu hồi về kho trước khi xóa.'
+    )
   }
   const db = getDb()
   const inProgress = db

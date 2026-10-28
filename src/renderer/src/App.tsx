@@ -25,6 +25,8 @@ import { AuditDetailPage } from './pages/audits/AuditDetailPage'
 import { CategoriesPage } from './pages/catalog/CategoriesPage'
 import { DepartmentsPage, LocationsPage, SuppliersPage } from './pages/catalog/SimpleCatalogPages'
 import { EmployeesPage } from './pages/catalog/EmployeesPage'
+import { SystemsPage } from './pages/systems/SystemsPage'
+import { InfrastructurePage } from './pages/systems/InfrastructurePage'
 import { ReportsPage } from './pages/ReportsPage'
 import { UsersPage } from './pages/users/UsersPage'
 import { ActivityPage } from './pages/activity/ActivityPage'
@@ -133,6 +135,8 @@ export default function App() {
             <Route path="/maintenance" element={<MaintenancePage />} />
             <Route path="/audits" element={<AuditsPage />} />
             <Route path="/audits/:id" element={<AuditDetailPage />} />
+            <Route path="/systems" element={<SystemsPage />} />
+            <Route path="/infrastructure" element={<InfrastructurePage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/departments" element={<DepartmentsPage />} />
             <Route path="/locations" element={<LocationsPage />} />

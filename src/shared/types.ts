@@ -10,6 +10,14 @@ export type OrgBlock = 'party' | 'state'
 export type AssetStatus = 'available' | 'in_use' | 'maintenance' | 'reserved' | 'disposed' | 'lost'
 export type AssetCondition = 'new' | 'good' | 'fair' | 'poor' | 'broken'
 
+/**
+ * Hình thức phân bổ thiết bị:
+ * - none: chưa phân bổ (chỉ gắn đơn vị quản lý nếu có)
+ * - employee: giao cho một nhân viên sử dụng
+ * - department: phân bổ cho phòng ban/đơn vị sử dụng, không cần giao cho nhân viên
+ */
+export type AllocationType = 'none' | 'employee' | 'department'
+
 export type AssignmentStatus = 'active' | 'returned'
 
 export type MaintenanceType = 'preventive' | 'corrective' | 'inspection' | 'upgrade'
@@ -226,6 +234,10 @@ export interface Asset {
   locationName: string | null
   assignedEmployeeId: number | null
   assignedEmployeeName: string | null
+  /** Hình thức phân bổ hiện tại của thiết bị. */
+  allocationType: AllocationType
+  /** Ngày phân bổ cho phòng ban (nếu allocationType = department). */
+  allocatedAt: string | null
   supplierId: number | null
   supplierName: string | null
   purchaseDate: string | null
@@ -262,6 +274,8 @@ export interface AssetInput {
   departmentId?: number | null
   locationId?: number | null
   assignedEmployeeId?: number | null
+  /** Mặc định suy ra từ dữ liệu: có nhân viên => employee, ngược lại none. */
+  allocationType?: AllocationType
   supplierId?: number | null
   purchaseDate?: string | null
   purchasePrice?: number
@@ -287,6 +301,7 @@ export interface AssetListParams {
   condition?: AssetCondition | 'all'
   supplierId?: number | null
   assignedEmployeeId?: number | null
+  allocationType?: AllocationType | 'all'
   warrantyExpiringDays?: number | null
   ids?: number[]
   sortBy?: 'code' | 'name' | 'purchaseDate' | 'purchasePrice' | 'createdAt' | 'status'
@@ -308,6 +323,7 @@ export interface AssetDetail {
   asset: Asset
   attachments: AssetAttachment[]
   assignments: Assignment[]
+  departmentAssignments: DepartmentAssignment[]
   maintenance: MaintenanceRecord[]
   logs: ActivityLog[]
 }
@@ -367,6 +383,21 @@ export interface ReturnInput {
   conditionAfter?: AssetCondition | null
   locationId?: number | null
   note?: string | null
+}
+
+/** Lịch sử phân bổ thiết bị cho phòng ban (không giao cho nhân viên). */
+export interface DepartmentAssignment {
+  id: number
+  assetId: number
+  departmentId: number
+  departmentName: string
+  assignedDate: string
+  returnedDate: string | null
+  status: AssignmentStatus
+  note: string | null
+  returnNote: string | null
+  createdByName: string | null
+  createdAt: string
 }
 
 /* ----------------------------- Maintenance ----------------------------- */
@@ -590,6 +621,7 @@ export interface DashboardKpis {
 
 export interface DashboardData {
   kpis: DashboardKpis
+  systemSummary: SystemSummaryKpis
   byCategory: Array<{ name: string; count: number; value: number }>
   byStatus: Array<{ status: AssetStatus; count: number }>
   byBlock: Array<{ block: OrgBlock; count: number; value: number }>
@@ -641,6 +673,8 @@ export interface AppSettings {
   maintenanceWarningDays: number
   defaultDepreciationMonths: number
   loginNotice: string
+  /** Cho phép nhiều HTTT dùng chung một số quyết định phê duyệt cấp độ. */
+  allowSharedDecisionNumber: boolean
 }
 
 export type SettingsInput = Partial<AppSettings>
@@ -774,6 +808,161 @@ export interface HardwareScanResult {
   scannedAt: string
   /** Các trường cấu hình đúng khóa của mẫu PC/Laptop trong ứng dụng. */
   specs: Record<string, string | number>
+}
+
+/* ---------------------- Hạ tầng CNTT & HTTT --------------------------- */
+
+/** Trạng thái hệ thống thông tin. */
+export type SystemStatus = 'operating' | 'building' | 'suspended'
+/** Cấp độ an toàn thông tin theo Nghị định 85/2016/NĐ-CP. */
+export type SystemLevel = 1 | 2 | 3 | 4 | 5
+/** Hình thức triển khai của HTTT. */
+export type SystemHostingType = 'none' | 'physical' | 'virtual' | 'cloud' | 'hybrid'
+export type SystemDocumentType = 'decision' | 'profile' | 'other'
+
+/** Số liệu hạ tầng CNTT cấp đơn vị (một bản ghi duy nhất). */
+export interface ItInfrastructure {
+  physicalServers: number
+  virtualServers: number
+  switches: number
+  firewalls: number
+  note: string | null
+  updatedAt: string | null
+  updatedByName: string | null
+}
+
+export interface ItInfrastructureInput {
+  physicalServers: number
+  virtualServers: number
+  switches: number
+  firewalls: number
+  note?: string | null
+}
+
+export interface InfrastructureChange {
+  field: 'physicalServers' | 'virtualServers' | 'switches' | 'firewalls' | 'note'
+  label: string
+  before: string | null
+  after: string | null
+}
+
+export interface InfrastructureHistoryEntry extends ItInfrastructureInput {
+  id: number
+  changedByName: string | null
+  changedAt: string
+  changes: InfrastructureChange[]
+}
+
+export interface InfrastructureOverview {
+  current: ItInfrastructure
+  history: InfrastructureHistoryEntry[]
+}
+
+export interface InformationSystem {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  /** Đơn vị/bộ phận quản lý, vận hành (bắt buộc). */
+  managingUnit: string
+  departmentId: number | null
+  departmentName: string | null
+  /** null = chưa xác định cấp độ. */
+  level: SystemLevel | null
+  decisionNumber: string | null
+  decisionDate: string | null
+  decisionAgency: string | null
+  status: SystemStatus
+  hostingType: SystemHostingType
+  hostingDetail: string | null
+  assetId: number | null
+  assetCode: string | null
+  assetName: string | null
+  fileCount: number
+  decisionFileCount: number
+  profileFileCount: number
+  createdByName: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InformationSystemInput {
+  code?: string
+  name: string
+  description?: string | null
+  managingUnit: string
+  departmentId?: number | null
+  level?: SystemLevel | null
+  decisionNumber?: string | null
+  decisionDate?: string | null
+  decisionAgency?: string | null
+  status?: SystemStatus
+  hostingType?: SystemHostingType
+  hostingDetail?: string | null
+  assetId?: number | null
+}
+
+export interface InformationSystemListParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  level?: SystemLevel | 'unset' | 'all'
+  status?: SystemStatus | 'all'
+  departmentId?: number | null
+  managingUnit?: string
+  fromDate?: string | null
+  toDate?: string | null
+  sortBy?: 'code' | 'name' | 'level' | 'updatedAt'
+  sortDir?: 'asc' | 'desc'
+}
+
+export interface InformationSystemFile {
+  id: number
+  systemId: number
+  filename: string
+  storedName: string
+  mimeType: string | null
+  size: number
+  documentType: SystemDocumentType
+  createdAt: string
+  createdByName: string | null
+}
+
+export interface InformationSystemDetail {
+  system: InformationSystem
+  files: InformationSystemFile[]
+}
+
+export interface SystemWarning {
+  id: number
+  code: string
+  name: string
+  level: SystemLevel | null
+  issues: string[]
+}
+
+export interface SystemSummaryKpis {
+  total: number
+  approved: number
+  approvalRate: number
+  unsetLevel: number
+  level3Plus: number
+  warningCount: number
+  infrastructureTotal: number
+}
+
+export interface SystemDashboard {
+  kpis: SystemSummaryKpis
+  byLevel: Array<{ level: SystemLevel | 0; label: string; count: number }>
+  byStatus: Array<{ status: SystemStatus; count: number }>
+  byUnit: Array<{ unit: string; count: number }>
+  warnings: SystemWarning[]
+  infrastructure: ItInfrastructure
+}
+
+export interface SystemSaveResult {
+  system: InformationSystem
+  warnings: string[]
 }
 
 /* ------------------------------- Common -------------------------------- */

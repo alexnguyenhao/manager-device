@@ -8,7 +8,11 @@ import type {
   MaintenanceStatus,
   MaintenanceType,
   OrgBlock,
-  Role
+  Role,
+  SystemDocumentType,
+  SystemHostingType,
+  SystemLevel,
+  SystemStatus
 } from './types'
 
 /* ------------------------------- Tổ chức ------------------------------- */
@@ -60,6 +64,9 @@ export type Permission =
   | 'assignment:write'
   | 'maintenance:write'
   | 'audit:write'
+  | 'system:write'
+  | 'system:delete'
+  | 'infrastructure:write'
   | 'report:read'
   | 'log:read'
   | 'settings:write'
@@ -74,6 +81,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'assignment:write',
     'maintenance:write',
     'audit:write',
+    'system:write',
+    'system:delete',
+    'infrastructure:write',
     'report:read',
     'log:read',
     'settings:write',
@@ -87,11 +97,23 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'assignment:write',
     'maintenance:write',
     'audit:write',
+    'system:write',
+    'system:delete',
+    'infrastructure:write',
     'report:read',
     'log:read',
     'backup'
   ],
-  staff: ['asset:write', 'assignment:write', 'maintenance:write', 'audit:write', 'report:read'],
+  staff: [
+    'asset:write',
+    'assignment:write',
+    'maintenance:write',
+    'audit:write',
+    'system:write',
+    'system:delete',
+    'infrastructure:write',
+    'report:read'
+  ],
   viewer: ['report:read']
 }
 
@@ -183,6 +205,45 @@ export const AUDIT_RESULT_OPTIONS: AuditResult[] = [
   'missing'
 ]
 
+/* -------------------------- Hạ tầng & HTTT ----------------------------- */
+
+export const SYSTEM_LEVEL_OPTIONS: SystemLevel[] = [1, 2, 3, 4, 5]
+
+export const SYSTEM_LEVEL_META: Record<SystemLevel, StatusMeta> = {
+  1: { label: 'Cấp độ 1', tone: 'success', description: 'Ảnh hưởng hẹp, ít rủi ro' },
+  2: { label: 'Cấp độ 2', tone: 'teal', description: 'Ảnh hưởng nội bộ đơn vị' },
+  3: { label: 'Cấp độ 3', tone: 'warning', description: 'Ảnh hưởng diện rộng, cần hồ sơ đầy đủ' },
+  4: { label: 'Cấp độ 4', tone: 'danger', description: 'Ảnh hưởng nghiêm trọng, bắt buộc phê duyệt' },
+  5: { label: 'Cấp độ 5', tone: 'purple', description: 'Ảnh hưởng đặc biệt nghiêm trọng' }
+}
+
+export const SYSTEM_STATUS_META: Record<SystemStatus, StatusMeta> = {
+  operating: { label: 'Đang vận hành', tone: 'success', description: 'HTTT đang được sử dụng' },
+  building: { label: 'Đang xây dựng', tone: 'info', description: 'HTTT đang triển khai, xây dựng' },
+  suspended: { label: 'Ngừng hoạt động', tone: 'neutral', description: 'HTTT tạm dừng hoặc đã dừng' }
+}
+
+export const SYSTEM_STATUS_OPTIONS: SystemStatus[] = ['operating', 'building', 'suspended']
+
+export const SYSTEM_HOSTING_META: Record<SystemHostingType, StatusMeta> = {
+  none: { label: 'Chưa xác định', tone: 'neutral', description: 'Chưa xác định nơi triển khai' },
+  physical: { label: 'Máy chủ vật lý', tone: 'info', description: 'Chạy trên máy chủ vật lý tại đơn vị' },
+  virtual: { label: 'Máy ảo', tone: 'teal', description: 'Chạy trên nền tảng ảo hóa' },
+  cloud: { label: 'Điện toán đám mây', tone: 'purple', description: 'Thuê dịch vụ hoặc đặt tại trung tâm dữ liệu' },
+  hybrid: { label: 'Kết hợp', tone: 'warning', description: 'Kết hợp nhiều hình thức triển khai' }
+}
+
+export const SYSTEM_DOCUMENT_TYPE_META: Record<SystemDocumentType, StatusMeta> = {
+  decision: { label: 'Quyết định phê duyệt', tone: 'info', description: 'Quyết định phê duyệt cấp độ HTTT' },
+  profile: { label: 'Hồ sơ đề xuất cấp độ', tone: 'teal', description: 'Hồ sơ, tài liệu đề xuất cấp độ' },
+  other: { label: 'Tài liệu khác', tone: 'neutral', description: 'Tài liệu kèm theo' }
+}
+
+/** Nhãn hiển thị cho cấp độ, bao gồm trường hợp chưa xác định. */
+export function systemLevelLabel(level: SystemLevel | null): string {
+  return level ? SYSTEM_LEVEL_META[level]?.label ?? `Cấp độ ${level}` : 'Chưa xác định cấp độ'
+}
+
 /* ------------------------------ Defaults ------------------------------- */
 
 export const DEFAULT_PAGE_SIZE = 15
@@ -207,6 +268,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   user: 'Người dùng',
   settings: 'Cài đặt',
   report: 'Báo cáo',
+  information_system: 'Hệ thống thông tin',
+  infrastructure: 'Hạ tầng CNTT',
   system: 'Hệ thống'
 }
 

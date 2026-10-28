@@ -8,6 +8,8 @@ import {
   History,
   MapPin,
   MonitorSmartphone,
+  Network,
+  ServerCog,
   Settings,
   ShieldCheck,
   Tags,
@@ -44,7 +46,9 @@ const ENTITY_ICONS: Record<string, LucideIcon> = {
   user: ShieldCheck,
   settings: Settings,
   report: History,
-  system: History
+  system: History,
+  information_system: ServerCog,
+  infrastructure: Network
 }
 
 const ENTITY_ORDER = [
@@ -60,7 +64,9 @@ const ENTITY_ORDER = [
   'user',
   'report',
   'settings',
-  'system'
+  'system',
+  'information_system',
+  'infrastructure'
 ]
 
 function actionTone(action: string): Tone {

@@ -27,7 +27,9 @@ Có thể thêm, sửa hoặc ngừng sử dụng phòng ban tại **Cơ cấu t
 - **Quét cấu hình máy** — Nút **Quét máy này** đọc CPU, RAM, ổ cứng, GPU, màn hình, Windows, serial và tự điền biểu mẫu PC/Laptop; chạy qua PowerShell có sẵn nên không bị Smart App Control chặn.
 - **Thu thập từ xa** — [Web tool](https://alexnguyenhao.github.io/manager-device/) chạy trên trình duyệt, máy cán bộ không cần cài gì: dán một lệnh PowerShell, gom nhiều máy rồi xuất CSV nhập vào phần mềm.
 - **Hồ sơ thiết bị** — Cấu hình chi tiết theo danh mục (CPU, RAM, GPU, dung lượng ổ cứng, hệ điều hành/Windows…), khấu hao, bảo hành, tệp đính kèm, lịch sử cấp phát/bảo trì/nhật ký.
-- **Cấp phát & thu hồi** — Bàn giao thiết bị cho cán bộ, công chức, theo dõi hạn trả, tình trạng trước/sau khi thu hồi.
+- **Xuất cấu hình thiết bị** — Xuất Excel danh sách thiết bị kèm **đầy đủ thông số cấu hình**; mỗi danh mục một sheet với đúng các cột thông số của danh mục đó, thuận tiện lập báo cáo và đối chiếu.
+- **Cấp phát & thu hồi** — Bàn giao thiết bị cho cán bộ, công chức **hoặc phân bổ cho phòng ban** mà không cần giao cho nhân viên; theo dõi hạn trả, tình trạng trước/sau khi thu hồi.
+- **Hạ tầng CNTT & HTTT** — Quản lý tập trung số liệu máy chủ vật lý, máy ảo, switch, firewall (có lịch sử thay đổi) và danh mục hệ thống thông tin kèm cấp độ an toàn 1–5, số quyết định phê duyệt, hồ sơ PDF, dashboard, báo cáo Excel/PDF và nhập hàng loạt từ Excel.
 - **Bảo trì & sửa chữa** — Lập lịch, theo dõi tiến độ, chi phí, nhà cung cấp và lịch sử bảo dưỡng.
 - **Kiểm kê** — Tạo phiên kiểm kê, quét QR bằng webcam hoặc đầu đọc mã vạch, đối chiếu vị trí/người sử dụng, xuất kết quả.
 - **Danh mục** — Danh mục thiết bị với bộ thông số riêng, mẫu cấu hình dựng sẵn cho PC/Laptop/máy in/thiết bị mạng…, cơ cấu tổ chức, vị trí, nhà cung cấp, nhân viên.
@@ -72,7 +74,7 @@ Bộ cài Windows (.exe) và AppImage Linux được tạo tự động bởi Gi
 
 **https://github.com/alexnguyenhao/manager-device/releases/latest**
 
-Tải `ManagerDevice-Setup-1.0.4.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng. File Excel mẫu nhập thiết bị cũng được đính kèm trong mục **Assets** của bản phát hành.
+Tải `ManagerDevice-Setup-1.0.5.exe`, chạy và làm theo hướng dẫn cài đặt. Ứng dụng chạy hoàn toàn cục bộ, dữ liệu lưu trên máy người dùng. File Excel mẫu nhập thiết bị cũng được đính kèm trong mục **Assets** của bản phát hành.
 
 ---
 
@@ -95,7 +97,7 @@ npm run build
 npm run build:win
 ```
 
-Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `ManagerDevice-Setup-1.0.4.exe`.
+Bộ cài sau khi build nằm trong thư mục `release/` với tên dạng `ManagerDevice-Setup-1.0.5.exe`.
 
 > Nếu mạng npm không ổn định, có thể chạy `npm install --prefer-offline` hoặc cấu hình registry nội bộ. Không cần tải binary Electron riêng — npm sẽ tự tải khi cài đặt bình thường.
 
@@ -174,9 +176,36 @@ node scripts/generate-import-template.mjs --db "/path/to/manager-device.db" --ou
 
 ---
 
+## Xuất danh sách thiết bị kèm cấu hình
+
+Vào **Thiết bị → Excel → Xuất kèm cấu hình đầy đủ**.
+
+- Áp dụng đúng bộ lọc và thứ tự sắp xếp đang xem: từ khóa, danh mục, trạng thái, hình thức phân bổ, phòng ban, khối, vị trí, bảo hành.
+- Workbook gồm:
+  - **Danh sách thiết bị** — toàn bộ thiết bị với mã, tên, danh mục, serial, model, hãng, phòng ban, người sử dụng, trạng thái, tình trạng, vị trí, ngày mua, bảo hành và cột **Cấu hình đầy đủ** (ghép mọi thông số thành một chuỗi dễ đọc).
+  - **Mỗi danh mục một sheet** (Máy tính để bàn, Laptop, Máy in…) — các cột thông số đúng theo `specSchema` của danh mục (CPU, RAM, ổ cứng, tốc độ in, khổ giấy…), kèm mã, tên, serial, model, hãng, phòng ban, người sử dụng, trạng thái, ghi chú.
+- Mỗi sheet có 2 dòng tiêu đề báo cáo, dòng 3 là tiêu đề cột, đóng băng và bật auto-filter; giá trị số (RAM, tốc độ, số cổng…) được giữ ở dạng số để tính toán/sắp xếp.
+- Tên tệp: `danh-sach-thiet-bi-cau-hinh-YYYYMMDD.xlsx`.
+
+---
+
+## Hạ tầng CNTT & hệ thống thông tin
+
+Chức năng phục vụ quản lý tập trung hạ tầng và danh mục HTTT, đáp ứng báo cáo, kiểm tra, thanh tra an toàn thông tin.
+
+- **Hạ tầng CNTT** (menu *Hạ tầng & HTTT → Hạ tầng CNTT*): nhập số lượng máy chủ vật lý, máy ảo, switch, firewall; mỗi lần lưu đều ghi người cập nhật, thời điểm và bảng so sánh trước/sau.
+- **Danh mục HTTT** (menu *Hạ tầng & HTTT → Hệ thống thông tin*): mã tự sinh `HTTT-0001`, tên duy nhất, đơn vị quản lý, cấp độ 1–5 hoặc “Chưa xác định cấp độ”, số/ngày/cơ quan quyết định, trạng thái, hình thức triển khai, thiết bị liên kết và tệp hồ sơ. Hỗ trợ tìm kiếm, lọc theo cấp độ/trạng thái/phòng ban/thời gian, xóa mềm.
+- **Kiểm tra nghiệp vụ**: chặn lưu khi đã có cấp độ mà thiếu số quyết định; chặn trùng số quyết định (có thể bật dùng chung trong **Cài đặt**); cảnh báo HTTT chưa xác định cấp độ hoặc cấp độ ≥ 3 thiếu ngày ký, cơ quan ban hành, hồ sơ đính kèm.
+- **Báo cáo**: xuất Excel nhiều sheet (tổng hợp hạ tầng, phân bố cấp độ, danh sách HTTT, cảnh báo) và PDF theo mẫu, áp dụng bộ lọc thời gian đang chọn.
+- **Nhập hàng loạt**: tải mẫu Excel, nhập dữ liệu, xem báo cáo dòng lỗi; dòng có mã đã tồn tại sẽ được cập nhật.
+
+Chi tiết thiết kế cơ sở dữ liệu, danh sách màn hình/API và hướng dẫn sử dụng: **`docs/huong-dan-ha-tang-httt.md`**.
+
+---
+
 ## Tài khoản dùng thử
 
-Lần chạy đầu tiên, ứng dụng tự tạo dữ liệu mẫu mô phỏng **UBND xã An Bình**: 9 phòng ban, đơn vị thuộc 2 khối, 18 cán bộ công chức, 25 thiết bị và 4 nhà cung cấp địa phương, cùng 4 tài khoản:
+Lần chạy đầu tiên, ứng dụng tự tạo dữ liệu mẫu mô phỏng **UBND xã An Bình**: 9 phòng ban, đơn vị thuộc 2 khối, 18 cán bộ công chức, 25 thiết bị (trong đó 01 thiết bị phân bổ cho phòng ban), 4 nhà cung cấp địa phương, 10 hệ thống thông tin và số liệu hạ tầng mẫu, cùng 4 tài khoản:
 
 | Tên đăng nhập | Mật khẩu | Vai trò |
 | --- | --- | --- |
@@ -329,4 +358,4 @@ managerDevice/
 
 ---
 
-© 2026 Manager Device · Phiên bản 1.0.4
+© 2026 Manager Device · Phiên bản 1.0.5

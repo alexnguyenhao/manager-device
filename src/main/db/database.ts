@@ -252,7 +252,103 @@ ALTER TABLE departments ADD COLUMN block TEXT NOT NULL DEFAULT 'state'
 CREATE INDEX IF NOT EXISTS idx_departments_block ON departments(block);
 `
 
-const MIGRATIONS: string[] = [SCHEMA_V1, SCHEMA_V2]
+const SCHEMA_V3 = /* sql */ `
+ALTER TABLE assets ADD COLUMN allocation_type TEXT NOT NULL DEFAULT 'none';
+UPDATE assets SET allocation_type = 'employee' WHERE assigned_employee_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_assets_allocation ON assets(allocation_type);
+
+CREATE TABLE IF NOT EXISTS department_assignments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+  assigned_date TEXT NOT NULL,
+  returned_date TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','returned')),
+  note TEXT,
+  return_note TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dept_assignments_asset ON department_assignments(asset_id);
+CREATE INDEX IF NOT EXISTS idx_dept_assignments_department ON department_assignments(department_id);
+CREATE INDEX IF NOT EXISTS idx_dept_assignments_status ON department_assignments(status);
+
+CREATE TABLE IF NOT EXISTS it_infrastructure (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  physical_servers INTEGER NOT NULL DEFAULT 0,
+  virtual_servers INTEGER NOT NULL DEFAULT 0,
+  switches INTEGER NOT NULL DEFAULT 0,
+  firewalls INTEGER NOT NULL DEFAULT 0,
+  note TEXT,
+  updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO it_infrastructure
+  (id, physical_servers, virtual_servers, switches, firewalls, note, updated_by, updated_at)
+  VALUES (1, 0, 0, 0, 0, NULL, NULL, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+
+CREATE TABLE IF NOT EXISTS it_infrastructure_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  physical_servers INTEGER NOT NULL,
+  virtual_servers INTEGER NOT NULL,
+  switches INTEGER NOT NULL,
+  firewalls INTEGER NOT NULL,
+  note TEXT,
+  changes TEXT NOT NULL DEFAULT '[]',
+  changed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  changed_by_name TEXT,
+  changed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_infra_history_changed ON it_infrastructure_history(changed_at);
+
+CREATE TABLE IF NOT EXISTS information_systems (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  managing_unit TEXT NOT NULL,
+  department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+  level INTEGER CHECK (level IS NULL OR level BETWEEN 1 AND 5),
+  decision_number TEXT,
+  decision_date TEXT,
+  decision_agency TEXT,
+  status TEXT NOT NULL DEFAULT 'operating'
+    CHECK (status IN ('operating','building','suspended')),
+  hosting_type TEXT NOT NULL DEFAULT 'none'
+    CHECK (hosting_type IN ('none','physical','virtual','cloud','hybrid')),
+  hosting_detail TEXT,
+  asset_id INTEGER REFERENCES assets(id) ON DELETE SET NULL,
+  search_text TEXT NOT NULL DEFAULT '',
+  is_deleted INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT,
+  deleted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_systems_level ON information_systems(level);
+CREATE INDEX IF NOT EXISTS idx_systems_status ON information_systems(status);
+CREATE INDEX IF NOT EXISTS idx_systems_department ON information_systems(department_id);
+CREATE INDEX IF NOT EXISTS idx_systems_decision ON information_systems(decision_number);
+CREATE INDEX IF NOT EXISTS idx_systems_deleted ON information_systems(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_systems_search ON information_systems(search_text);
+
+CREATE TABLE IF NOT EXISTS information_system_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  system_id INTEGER NOT NULL REFERENCES information_systems(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  stored_name TEXT NOT NULL UNIQUE,
+  mime_type TEXT,
+  size INTEGER NOT NULL DEFAULT 0,
+  document_type TEXT NOT NULL DEFAULT 'other'
+    CHECK (document_type IN ('decision','profile','other')),
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_system_files_system ON information_system_files(system_id);
+`
+
+const MIGRATIONS: string[] = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3]
 
 export function openDatabase(): DatabaseSync {
   if (database) return database

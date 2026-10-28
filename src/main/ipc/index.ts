@@ -15,7 +15,12 @@ import type {
   MaintenanceUpdateInput,
   ReportParams,
   ReturnInput,
-  SettingsInput
+  SettingsInput,
+  InformationSystemInput,
+  InformationSystemListParams,
+  ItInfrastructureInput,
+  SystemDocumentType,
+  SystemLevel
 } from '../../shared/types'
 import { AppError, messageOf } from '../lib/errors'
 import { hasPermission, type Permission } from '../../shared/constants'
@@ -113,6 +118,28 @@ import {
 import { listLogs } from '../services/log-list.service'
 import { scanHardware } from '../services/hardware.service'
 import {
+  getInfrastructureOverview,
+  updateInfrastructure
+} from '../services/infrastructure.service'
+import {
+  deleteSystem,
+  deleteSystemFile,
+  getSystemDashboard,
+  getSystemDetail,
+  getSystemSummary,
+  listSystems,
+  openSystemFile,
+  saveSystem,
+  systemCodeSuggestion,
+  uploadSystemFile
+} from '../services/system.service'
+import {
+  downloadSystemImportTemplate,
+  exportSystemsExcel,
+  exportSystemsPdf,
+  importSystemsExcel
+} from '../services/system-report.service'
+import {
   deleteAttachment,
   openAttachment,
   uploadAttachment
@@ -120,6 +147,7 @@ import {
 import { listAttachments } from '../services/asset.service'
 import {
   downloadImportTemplate,
+  exportAssetConfigExcel,
   exportAssetsExcel,
   exportAuditExcel,
   exportReportExcel,
@@ -155,6 +183,11 @@ import {
   returnSchema,
   settingsSchema,
   supplierSchema,
+  systemFileIdSchema,
+  systemFileSchema,
+  systemListSchema,
+  systemSchema,
+  infrastructureSchema,
   userCreateSchema,
   userUpdateSchema
 } from '../lib/schemas'
@@ -316,6 +349,12 @@ export function registerIpcHandlers(): void {
       exportAssetsExcel(parse(assetListSchema, params ?? {}) as AssetListParams, user!),
     { permission: 'report:read' }
   )
+  handle(
+    'assets:exportConfigExcel',
+    (user, params) =>
+      exportAssetConfigExcel(parse(assetListSchema, params ?? {}) as AssetListParams, user!),
+    { permission: 'report:read' }
+  )
   handle('assets:importExcel', (user) => importAssetsExcel(user!), {
     permission: 'asset:write'
   })
@@ -474,6 +513,89 @@ export function registerIpcHandlers(): void {
     (user, params) => exportReportExcel(parse(reportSchema, params ?? {}) as ReportParams, user!),
     { permission: 'report:read' }
   )
+
+  /* --------------------------- Hạ tầng & HTTT --------------------------- */
+  handle('infrastructure:get', () => getInfrastructureOverview(), { permission: 'report:read' })
+  handle(
+    'infrastructure:update',
+    (user, payload) =>
+      updateInfrastructure(parse(infrastructureSchema, payload) as ItInfrastructureInput, user!),
+    { permission: 'infrastructure:write' }
+  )
+
+  const parseSystemList = (value: unknown): InformationSystemListParams => {
+    const data = parse(systemListSchema, value ?? {})
+    let level: InformationSystemListParams['level'] = 'all'
+    if (data.level === 'unset') {
+      level = 'unset'
+    } else if (data.level && data.level !== 'all') {
+      level = Number(data.level) as SystemLevel
+    }
+    return { ...data, level } as InformationSystemListParams
+  }
+
+  handle('systems:list', (_user, params) => listSystems(parseSystemList(params)), {
+    permission: 'report:read'
+  })
+  handle('systems:get', (_user, id) => getSystemDetail(parse(idSchema, id)), {
+    permission: 'report:read'
+  })
+  handle('systems:nextCode', () => systemCodeSuggestion(), { permission: 'system:write' })
+  handle(
+    'systems:save',
+    (user, payload) =>
+      saveSystem(parse(systemSchema, payload) as InformationSystemInput & { id?: number }, user!),
+    { permission: 'system:write' }
+  )
+  handle(
+    'systems:remove',
+    (user, id) => {
+      deleteSystem(parse(idSchema, id), user!)
+      return null
+    },
+    { permission: 'system:delete' }
+  )
+  handle('systems:dashboard', () => getSystemDashboard(), { permission: 'report:read' })
+  handle('systems:summary', () => getSystemSummary(), { permission: 'report:read' })
+  handle(
+    'systems:uploadFile',
+    (user, systemId, documentType) => {
+      const data = parse(systemFileSchema, { systemId, documentType })
+      return uploadSystemFile(
+        data.systemId,
+        (data.documentType ?? 'other') as SystemDocumentType,
+        user!
+      )
+    },
+    { permission: 'system:write' }
+  )
+  handle('systems:openFile', (_user, id) => openSystemFile(parse(systemFileIdSchema, id)), {
+    permission: 'report:read'
+  })
+  handle(
+    'systems:removeFile',
+    (user, id) => {
+      deleteSystemFile(parse(systemFileIdSchema, id), user!)
+      return null
+    },
+    { permission: 'system:write' }
+  )
+  handle(
+    'systems:exportExcel',
+    (user, params) => exportSystemsExcel(parseSystemList(params), user!),
+    { permission: 'report:read' }
+  )
+  handle(
+    'systems:exportPdf',
+    (user, params) => exportSystemsPdf(parseSystemList(params), user!),
+    { permission: 'report:read' }
+  )
+  handle('systems:importExcel', (user) => importSystemsExcel(user!), {
+    permission: 'system:write'
+  })
+  handle('systems:downloadTemplate', (user) => downloadSystemImportTemplate(user!), {
+    permission: 'report:read'
+  })
 
   /* -------------------------------- Users -------------------------------- */
   handle('users:list', () => listUsers(), { roles: ['admin'] })

@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs'
 import { app, dialog } from 'electron'
 import type {
+  Asset,
   AssetInput,
   AssetListParams,
   AssetStatus,
@@ -26,6 +27,7 @@ import {
   MAINTENANCE_TYPE_META
 } from '../../shared/constants'
 import { formatDate, formatNumber, normalizeForSearch, todayISO } from '../../shared/utils'
+import { formatSpecValue, getEffectiveSpecFields } from '../../shared/spec-presets'
 
 const HEADER_FILL = '1E40AF'
 const HEADER_FONT = 'FFFFFF'
@@ -44,6 +46,8 @@ const EXPORT_HEADERS: Array<{ header: string; key: string; width: number }> = [
   { header: 'Phòng ban', key: 'department', width: 24 },
   { header: 'Vị trí', key: 'location', width: 24 },
   { header: 'Người sử dụng', key: 'employee', width: 24 },
+  { header: 'Hình thức phân bổ', key: 'allocation', width: 18 },
+  { header: 'Phòng ban được phân bổ', key: 'allocatedDepartment', width: 26 },
   { header: 'Nhà cung cấp', key: 'supplier', width: 28 },
   { header: 'Ngày mua', key: 'purchaseDate', width: 13 },
   { header: 'Giá mua', key: 'purchasePrice', width: 16 },
@@ -138,6 +142,14 @@ export async function exportAssetsExcel(params: AssetListParams, user: AuthUser)
       department: asset.departmentName ?? '',
       location: asset.locationName ?? '',
       employee: asset.assignedEmployeeName ?? '',
+      allocation:
+        asset.allocationType === 'department'
+          ? 'Phòng ban'
+          : asset.allocationType === 'employee'
+            ? 'Nhân viên'
+            : 'Chưa phân bổ',
+      allocatedDepartment:
+        asset.allocationType === 'department' ? asset.departmentName ?? '' : '',
       supplier: asset.supplierName ?? '',
       purchaseDate: formatDate(asset.purchaseDate),
       purchasePrice: asset.purchasePrice,
@@ -159,6 +171,233 @@ export async function exportAssetsExcel(params: AssetListParams, user: AuthUser)
   )
   if (!result.canceled) {
     logActivity(user, 'Xuất Excel danh sách thiết bị', 'asset', null, `${assets.length} thiết bị`)
+    result.count = assets.length
+  }
+  return result
+}
+
+/* ------------------- Xuất danh sách kèm cấu hình ----------------------- */
+
+const INVALID_SHEET_CHARS = /[\\/?*[\]:]/g
+
+/** Tên sheet Excel: bỏ ký tự cấm, giới hạn 31 ký tự, không trùng nhau. */
+function uniqueSheetName(base: string, used: Set<string>): string {
+  const cleaned = base.replace(INVALID_SHEET_CHARS, ' ').replace(/\s+/g, ' ').trim() || 'Danh mục'
+  let name = cleaned.slice(0, 31)
+  let counter = 2
+  while (used.has(name.toLowerCase())) {
+    const suffix = ` (${counter})`
+    name = `${cleaned.slice(0, 31 - suffix.length).trimEnd()}${suffix}`
+    counter += 1
+  }
+  used.add(name.toLowerCase())
+  return name
+}
+
+/** Ghép toàn bộ thông số cấu hình thành một chuỗi dễ đọc. */
+function specSummary(
+  specs: Record<string, string | number> | null | undefined,
+  fields: SpecField[]
+): string {
+  const parts: string[] = []
+  const known = new Set<string>()
+  for (const field of fields) {
+    known.add(field.key)
+    const value = specs?.[field.key]
+    if (value === undefined || value === null || String(value).trim() === '') continue
+    parts.push(`${field.label}: ${formatSpecValue(value, field)}`)
+  }
+  for (const [key, value] of Object.entries(specs ?? {})) {
+    if (known.has(key)) continue
+    if (value === undefined || value === null || String(value).trim() === '') continue
+    parts.push(`${key}: ${value}`)
+  }
+  return parts.join('; ')
+}
+
+/** Sheet báo cáo: 2 dòng tiêu đề, dòng 3 là tiêu đề cột, đóng băng 3 dòng. */
+function addReportSheet(
+  workbook: ExcelJS.Workbook,
+  name: string,
+  title: string,
+  subtitle: string,
+  headers: Array<{ header: string; width: number }>
+): ExcelJS.Worksheet {
+  const sheet = workbook.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 3 }] })
+  sheet.columns = headers.map((header) => ({ width: header.width }))
+  workbookTitle(sheet, title, subtitle, headers.length)
+  const headerRow = sheet.getRow(3)
+  headers.forEach((header, index) => {
+    headerRow.getCell(index + 1).value = header.header
+  })
+  styleHeader(headerRow)
+  headerRow.height = 28
+  sheet.autoFilter = {
+    from: { row: 3, column: 1 },
+    to: { row: 3, column: headers.length }
+  }
+  return sheet
+}
+
+function allocationOwner(asset: Asset): string {
+  if (asset.allocationType === 'department') {
+    return `${asset.departmentName ?? 'Phòng ban'} (phòng ban)`
+  }
+  return asset.assignedEmployeeName ?? ''
+}
+
+function specCellValue(
+  specs: Record<string, string | number> | null | undefined,
+  field: SpecField
+): string | number {
+  const value = specs?.[field.key]
+  if (value === undefined || value === null || String(value).trim() === '') return ''
+  return value
+}
+
+/**
+ * Xuất danh sách thiết bị kèm đầy đủ cấu hình:
+ * - Sheet "Danh sách thiết bị": toàn bộ thiết bị + cột cấu hình tổng hợp.
+ * - Mỗi danh mục một sheet riêng, các cột là đúng thông số cấu hình của danh mục đó.
+ */
+export async function exportAssetConfigExcel(
+  params: AssetListParams,
+  user: AuthUser
+): Promise<ExportResult> {
+  const assets = listAllAssets({ ...params, pageSize: 500 })
+  const categories = listCategories()
+  const categoryById = new Map(categories.map((category) => [category.id, category]))
+  const fieldsByCategory = new Map<number, SpecField[]>()
+  const fieldsOf = (categoryId: number): SpecField[] => {
+    const cached = fieldsByCategory.get(categoryId)
+    if (cached) return cached
+    const fields = getEffectiveSpecFields(categoryById.get(categoryId))
+    fieldsByCategory.set(categoryId, fields)
+    return fields
+  }
+
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'Manager Device'
+  workbook.created = new Date()
+  const usedNames = new Set<string>()
+  const subtitle = `Lập ngày ${formatDate(todayISO())} · ${assets.length} thiết bị`
+
+  const overview = addReportSheet(
+    workbook,
+    uniqueSheetName('Danh sách thiết bị', usedNames),
+    'DANH SÁCH THIẾT BỊ KÈM CẤU HÌNH',
+    subtitle,
+    [
+      { header: 'STT', width: 6 },
+      { header: 'Mã thiết bị', width: 15 },
+      { header: 'Tên thiết bị', width: 36 },
+      { header: 'Danh mục', width: 20 },
+      { header: 'Serial', width: 20 },
+      { header: 'Model', width: 20 },
+      { header: 'Hãng sản xuất', width: 16 },
+      { header: 'Phòng ban', width: 24 },
+      { header: 'Người sử dụng', width: 24 },
+      { header: 'Trạng thái', width: 15 },
+      { header: 'Tình trạng', width: 12 },
+      { header: 'Vị trí', width: 22 },
+      { header: 'Ngày mua', width: 12 },
+      { header: 'Bảo hành đến', width: 12 },
+      { header: 'Cấu hình đầy đủ', width: 70 }
+    ]
+  )
+  assets.forEach((asset, index) => {
+    const row = overview.addRow([
+      index + 1,
+      asset.code,
+      asset.name,
+      asset.categoryName,
+      asset.serialNumber ?? '',
+      asset.model ?? '',
+      asset.manufacturer ?? '',
+      asset.departmentName ?? '',
+      allocationOwner(asset),
+      ASSET_STATUS_META[asset.status].label,
+      ASSET_CONDITION_META[asset.condition].label,
+      asset.locationName ?? '',
+      formatDate(asset.purchaseDate),
+      formatDate(asset.warrantyExpiry),
+      specSummary(asset.specs, fieldsOf(asset.categoryId))
+    ])
+    row.alignment = { vertical: 'top', wrapText: true }
+  })
+  overview.getColumn(1).alignment = { horizontal: 'center' }
+
+  const groups = new Map<number, Asset[]>()
+  for (const asset of assets) {
+    const group = groups.get(asset.categoryId) ?? []
+    group.push(asset)
+    groups.set(asset.categoryId, group)
+  }
+  const sortedGroups = [...groups.entries()].sort((a, b) =>
+    (a[1][0]?.categoryName ?? '').localeCompare(b[1][0]?.categoryName ?? '', 'vi')
+  )
+  for (const [categoryId, group] of sortedGroups) {
+    const category = categoryById.get(categoryId)
+    const fields = fieldsOf(categoryId)
+    const categoryName = category?.name ?? group[0]?.categoryName ?? 'Danh mục'
+    const headers: Array<{ header: string; width: number }> = [
+      { header: 'STT', width: 6 },
+      { header: 'Mã thiết bị', width: 15 },
+      { header: 'Tên thiết bị', width: 36 },
+      ...fields.map((field) => ({
+        header: field.unit ? `${field.label} (${field.unit})` : field.label,
+        width: Math.min(
+          28,
+          Math.max(14, field.label.length + (field.unit?.length ?? 0) + 6)
+        )
+      })),
+      { header: 'Serial', width: 20 },
+      { header: 'Model', width: 20 },
+      { header: 'Hãng sản xuất', width: 16 },
+      { header: 'Phòng ban', width: 24 },
+      { header: 'Người sử dụng', width: 24 },
+      { header: 'Trạng thái', width: 15 },
+      { header: 'Ghi chú', width: 30 }
+    ]
+    const sheet = addReportSheet(
+      workbook,
+      uniqueSheetName(categoryName, usedNames),
+      `CẤU HÌNH THIẾT BỊ — ${categoryName.toUpperCase()}`,
+      `${subtitle} · ${group.length} thiết bị`,
+      headers
+    )
+    group.forEach((asset, index) => {
+      const row = sheet.addRow([
+        index + 1,
+        asset.code,
+        asset.name,
+        ...fields.map((field) => specCellValue(asset.specs, field)),
+        asset.serialNumber ?? '',
+        asset.model ?? '',
+        asset.manufacturer ?? '',
+        asset.departmentName ?? '',
+        allocationOwner(asset),
+        ASSET_STATUS_META[asset.status].label,
+        asset.note ?? ''
+      ])
+      row.alignment = { vertical: 'top', wrapText: true }
+    })
+    sheet.getColumn(1).alignment = { horizontal: 'center' }
+  }
+
+  const result = await savePath(
+    workbook,
+    `danh-sach-thiet-bi-cau-hinh-${todayISO().replace(/-/g, '')}.xlsx`,
+    'Xuất danh sách thiết bị kèm cấu hình'
+  )
+  if (!result.canceled) {
+    logActivity(
+      user,
+      'Xuất Excel cấu hình thiết bị',
+      'asset',
+      null,
+      `${assets.length} thiết bị, ${groups.size} danh mục`
+    )
     result.count = assets.length
   }
   return result

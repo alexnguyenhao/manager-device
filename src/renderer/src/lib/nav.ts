@@ -8,6 +8,8 @@ import {
   LayoutDashboard,
   MapPin,
   MonitorSmartphone,
+  Network,
+  ServerCog,
   Settings,
   ShieldCheck,
   Tags,
@@ -42,6 +44,13 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Cấp phát', to: '/assignments', icon: ArrowLeftRight },
       { label: 'Bảo trì & sửa chữa', to: '/maintenance', icon: Wrench },
       { label: 'Kiểm kê', to: '/audits', icon: ClipboardCheck }
+    ]
+  },
+  {
+    label: 'Hạ tầng & HTTT',
+    items: [
+      { label: 'Hệ thống thông tin', to: '/systems', icon: ServerCog, permission: 'report:read' },
+      { label: 'Hạ tầng CNTT', to: '/infrastructure', icon: Network, permission: 'report:read' }
     ]
   },
   {

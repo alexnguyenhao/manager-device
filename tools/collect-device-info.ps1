@@ -84,6 +84,7 @@ function Get-ConnectionFromPort([string]$PortName) {
     if (-not $PortName) { return "" }
     if ($PortName -match "^USB") { return "USB" }
     if ($PortName -match "^IP_") { return "LAN" }
+    if ($PortName -match "^WSD") { return "LAN" }
     if ($PortName -match "^(TCP|\\\\|LPT)") { return "LAN" }
     return ""
 }
@@ -267,7 +268,8 @@ if ($ramBusValues.Count -gt 0) {
 
 $gpuNames = @()
 $gpuMemories = @()
-foreach ($gpu in @(Get-CimInstance -ClassName Win32_VideoController)) {
+$videoControllers = @(Get-CimInstance -ClassName Win32_VideoController)
+foreach ($gpu in $videoControllers) {
     $name = Get-WmiText $gpu.Name
     if ($name -and $name -notmatch "Remote|Basic Display|Virtual|Microsoft Hyper-V") {
         $gpuNames += $name
@@ -308,6 +310,56 @@ try {
     }
 } catch { }
 $monitor = Join-UniqueText $monitorNames " + "
+
+# --- Màn hình: kích thước thực (EDID), độ phân giải gốc, tần số quét ---
+$screenSize = 0
+$screenResolution = ""
+$screenRefresh = 0
+$primaryMonitor = ""
+
+try {
+    $basicMonitors = @(Get-CimInstance -Namespace "root\wmi" -ClassName WmiMonitorBasicDisplayParams |
+        Where-Object { $_.Active -ne $false })
+    if ($basicMonitors.Count -gt 0) {
+        $primaryMonitor = [string]$basicMonitors[0].InstanceName
+        $widthCm = [double]$basicMonitors[0].MaxHorizontalImageSize
+        $heightCm = [double]$basicMonitors[0].MaxVerticalImageSize
+        if ($widthCm -gt 0 -and $heightCm -gt 0) {
+            $diagonalInch = [math]::Sqrt(($widthCm * $widthCm) + ($heightCm * $heightCm)) / 2.54
+            $size = [math]::Round($diagonalInch, 1)
+            if ([math]::Abs($size - [math]::Round($size, 0)) -le 0.25) {
+                $size = [math]::Round($size, 0)
+            }
+            $screenSize = $size
+        }
+    }
+} catch { }
+
+try {
+    foreach ($modeEntry in @(Get-CimInstance -Namespace "root\wmi" -ClassName WmiMonitorListedSupportedSourceModes)) {
+        if ($primaryMonitor -and $modeEntry.InstanceName -ne $primaryMonitor) { continue }
+        $modes = @($modeEntry.MonitorSourceModes)
+        if ($modes.Count -eq 0) { continue }
+        $preferred = $modes | Where-Object { $_.PreferredMode } | Select-Object -First 1
+        if (-not $preferred) { $preferred = $modes[0] }
+        if ($preferred -and $preferred.HorizontalActivePixels) {
+            $screenResolution = ([string]$preferred.HorizontalActivePixels + " x " + [string]$preferred.VerticalActivePixels)
+        }
+        break
+    }
+} catch { }
+
+$activeController = $videoControllers |
+    Where-Object { $_.CurrentHorizontalResolution -gt 0 } |
+    Select-Object -First 1
+if ($activeController) {
+    if (-not $screenResolution) {
+        $screenResolution = ([string]$activeController.CurrentHorizontalResolution + " x " + [string]$activeController.CurrentVerticalResolution)
+    }
+    if ($activeController.CurrentRefreshRate) {
+        $screenRefresh = [int][math]::Round([double]$activeController.CurrentRefreshRate, 0)
+    }
+}
 
 $osCaption = Get-WmiText $os.Caption
 $osName = Get-OsDisplayName $osCaption
@@ -376,6 +428,7 @@ if ($ramModules.Count -gt 0) {
     if ($slotInfo.Count -gt 0) { $computerNoteParts += ("RAM: " + ($slotInfo -join ", ")) }
 }
 if ($monitor) { $computerNoteParts += ("Màn hình: " + $monitor) }
+if ($screenResolution) { $computerNoteParts += ("Hiển thị: " + $screenResolution + $(if ($screenRefresh -gt 0) { " @ " + $screenRefresh + "Hz" } else { "" })) }
 if ($osVersion) { $computerNoteParts += ("Windows: " + $osVersion + "." + $osBuild) }
 $computerNote = ($computerNoteParts -join " • ")
 
@@ -409,9 +462,11 @@ $computerRow = [ordered]@{
     "Card đồ họa (GPU)"        = $gpu
     "Bộ nhớ GPU"               = $gpuMemory
     "Màn hình"                 = if ($isLaptop) { "" } else { $monitor }
+    "Độ phân giải màn hình"    = $screenResolution
+    "Tần số quét (Hz)"         = if ($screenRefresh -gt 0) { $screenRefresh.ToString($Invariant) } else { "" }
     "Hệ điều hành"             = $osName
     "Bản quyền Windows"        = $license
-    "Kích thước màn hình (inch)" = ""
+    "Kích thước màn hình (inch)" = if ($isLaptop -and $screenSize -gt 0) { $screenSize.ToString($Invariant) } else { "" }
     "Khối lượng"               = ""
     "Công nghệ in"             = ""
     "Tốc độ in"                = ""
@@ -429,6 +484,8 @@ $report.Add("CPU: " + $cpuName + $(if ($cpuCores -gt 0) { " (" + $cpuCores + " n
 $report.Add("RAM: " + $ramTotalGB + " GB" + $(if ($ramType) { " (" + $ramType + ")" } else { "" }) + $(if ($ramBus -gt 0) { " - Bus " + $ramBus + " MHz" } else { "" }))
 $report.Add("Ổ cứng: " + $storage)
 $report.Add("GPU: " + $gpu + $(if ($gpuMemory) { " (" + $gpuMemory + ")" } else { "" }))
+if ($screenSize -gt 0) { $report.Add("Kích thước màn hình: " + $screenSize + " inch") }
+if ($screenResolution) { $report.Add("Độ phân giải: " + $screenResolution + $(if ($screenRefresh -gt 0) { " @ " + $screenRefresh + " Hz" } else { "" })) }
 if ($monitor) { $report.Add("Màn hình: " + $monitor) }
 $report.Add("Hệ điều hành: " + $osCaption + " (" + $osVersion + "." + $osBuild + ")")
 $report.Add("Bản quyền Windows: " + $license)
@@ -440,6 +497,7 @@ Write-Host ("  CPU: " + $cpuName + $(if ($cpuCores -gt 0) { "  (" + $cpuCores + 
 Write-Host ("  RAM: " + $ramTotalGB + " GB " + $ramType + $(if ($ramBus -gt 0) { "  Bus " + $ramBus + " MHz" } else { "" }))
 Write-Host ("  Ổ cứng: " + $storage)
 Write-Host ("  GPU: " + $gpu + $(if ($gpuMemory) { "  (" + $gpuMemory + ")" } else { "" }))
+if ($screenSize -gt 0) { Write-Host ("  Màn hình: " + $screenSize + " inch  " + $screenResolution + $(if ($screenRefresh -gt 0) { "  " + $screenRefresh + " Hz" } else { "" })) }
 Write-Host ("  OS: " + $osName + " " + $osVersion)
 
 # ---------------------------------------------------------------------------
@@ -487,11 +545,23 @@ if (-not $NoPrinters) {
             if ($winPrinter -and $winPrinter.Default) { $isDefault = $true }
 
             $printerColor = ""
+            $duplex = ""
+            $paperSize = ""
+            $config = $null
             try {
                 $config = Get-PrintConfiguration -PrinterName $name
                 if ($null -ne $config.Color) {
                     if ($config.Color) { $printerColor = "Có" } else { $printerColor = "Không" }
                 }
+                if ($config.DuplexingMode) {
+                    switch ([string]$config.DuplexingMode) {
+                        "OneSided" { $duplex = "Không" }
+                        "TwoSidedLongEdge" { $duplex = "Có (trục dài)" }
+                        "TwoSidedShortEdge" { $duplex = "Có (trục ngắn)" }
+                        default { $duplex = [string]$config.DuplexingMode }
+                    }
+                }
+                if ($config.PaperSize) { $paperSize = ([string]$config.PaperSize).Trim() }
             } catch { }
 
             if (-not $printerColor -and $winPrinter) {
@@ -515,6 +585,18 @@ if (-not $NoPrinters) {
             } catch { }
             if (-not $hostAddress -and $port -match "(\d{1,3}(\.\d{1,3}){3})") {
                 $hostAddress = $Matches[1]
+            }
+
+            $ipAddress = ""
+            if ($hostAddress -match "^\d{1,3}(\.\d{1,3}){3}$") {
+                $ipAddress = $hostAddress
+            } elseif ($winPrinter -and $winPrinter.Location -match "(\d{1,3}(\.\d{1,3}){3})") {
+                $ipAddress = $Matches[1]
+            }
+
+            $printSpeed = 0
+            if ($winPrinter -and $winPrinter.AveragePagesPerMinute -gt 0) {
+                $printSpeed = [int][math]::Round([double]$winPrinter.AveragePagesPerMinute, 0)
             }
 
             $isOffline = $false
@@ -541,7 +623,9 @@ if (-not $NoPrinters) {
             if ($driver) { $printerNoteParts += ("Driver: " + $driver) }
             if ($isDefault) { $printerNoteParts += "Máy in mặc định" }
             if ($printer.Shared) { $printerNoteParts += ("Chia sẻ: " + (Get-WmiText $printer.ShareName)) }
-            if ($hostAddress) { $printerNoteParts += ("IP: " + $hostAddress) }
+            if ($ipAddress) { $printerNoteParts += ("IP: " + $ipAddress) }
+            if ($paperSize) { $printerNoteParts += ("Khổ giấy: " + $paperSize) }
+            if ($duplex) { $printerNoteParts += ("Hai mặt: " + $duplex) }
             if ($winPrinter -and $winPrinter.Location -and $winPrinter.Location -notmatch "^https?://") {
                 $printerNoteParts += ("Vị trí: " + (Get-WmiText $winPrinter.Location))
             }
@@ -577,16 +661,22 @@ if (-not $NoPrinters) {
                 "Card đồ họa (GPU)"        = ""
                 "Bộ nhớ GPU"               = ""
                 "Màn hình"                 = ""
+                "Độ phân giải màn hình"    = ""
+                "Tần số quét (Hz)"         = ""
                 "Hệ điều hành"             = ""
                 "Bản quyền Windows"        = ""
                 "Kích thước màn hình (inch)" = ""
                 "Khối lượng"               = ""
                 "Công nghệ in"             = $technology
-                "Tốc độ in"                = ""
+                "Tốc độ in"                = if ($printSpeed -gt 0) { $printSpeed.ToString($Invariant) } else { "" }
                 "Độ phân giải"             = $resolution
-                "Khổ giấy"                 = ""
+                "Khổ giấy"                 = $paperSize
                 "Kết nối"                  = $connection
                 "In màu"                   = $printerColor
+                "In hai mặt"               = $duplex
+                "Địa chỉ IP"               = $ipAddress
+                "Driver máy in"            = $driver
+                "Cổng in"                  = $port
             }
 
             $printerDetails += ("- " + $name + " | " + $driver + " | " + $port + " | " + $status + " | " + $(if ($isDefault) { "mặc định" } else { "không mặc định" }))
@@ -595,6 +685,7 @@ if (-not $NoPrinters) {
             Write-Host ("    Driver: " + $driver)
             Write-Host ("    Cổng: " + $port + "  Kết nối: " + $connection + "  Màu: " + $printerColor)
             Write-Host ("    Trạng thái: " + $status + "  Độ phân giải: " + $resolution)
+            Write-Host ("    Khổ giấy: " + $paperSize + "  Hai mặt: " + $duplex + "  IP: " + $ipAddress)
         }
 
         $report.Add("MÁY IN (" + $printerRows.Count + "):")
@@ -612,9 +703,11 @@ $headers = @(
     "Ngày mua", "Giá mua", "Tháng bảo hành", "Tháng khấu hao", "Giá trị thanh lý",
     "Số hóa đơn", "Ghi chú", "CPU", "Số nhân CPU", "Số luồng CPU", "RAM (GB)",
     "Loại RAM", "Bus RAM", "Dung lượng ổ cứng", "Card đồ họa (GPU)", "Bộ nhớ GPU",
-    "Màn hình", "Hệ điều hành", "Bản quyền Windows",
+    "Màn hình", "Độ phân giải màn hình", "Tần số quét (Hz)",
+    "Hệ điều hành", "Bản quyền Windows",
     "Kích thước màn hình (inch)", "Khối lượng", "Công nghệ in", "Tốc độ in",
-    "Độ phân giải", "Khổ giấy", "Kết nối", "In màu"
+    "Độ phân giải", "Khổ giấy", "Kết nối", "In màu",
+    "In hai mặt", "Địa chỉ IP", "Driver máy in", "Cổng in"
 )
 
 $rows = @()

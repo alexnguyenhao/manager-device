@@ -210,6 +210,11 @@ export function createAssignment(data: AssignmentInput, user: AuthUser): Assignm
 
   let assignmentId = 0
   transaction(() => {
+    db.prepare(
+      `UPDATE department_assignments
+       SET status = 'returned', returned_date = ?, return_note = ?
+       WHERE asset_id = ? AND status = 'active'`
+    ).run(data.assignedDate, 'Thu hồi khi cấp phát cho nhân viên', data.assetId)
     assignmentId = insertAssignment({
       assetId: data.assetId,
       employeeId: data.employeeId,
@@ -221,7 +226,8 @@ export function createAssignment(data: AssignmentInput, user: AuthUser): Assignm
       userId: user.id
     })
     db.prepare(
-      `UPDATE assets SET status = 'in_use', assigned_employee_id = ?, department_id = ?, updated_at = ?
+      `UPDATE assets SET status = 'in_use', assigned_employee_id = ?, department_id = ?,
+         allocation_type = 'employee', updated_at = ?
        WHERE id = ?`
     ).run(data.employeeId, departmentId, now, data.assetId)
   })
@@ -280,12 +286,12 @@ export function returnAssignment(data: ReturnInput, user: AuthUser): Assignment 
     if (data.locationId) {
       db.prepare(
         `UPDATE assets SET status = ?, condition = ?, assigned_employee_id = NULL,
-           location_id = ?, updated_at = ? WHERE id = ?`
+           allocation_type = 'none', location_id = ?, updated_at = ? WHERE id = ?`
       ).run(nextStatus, nextCondition, data.locationId, now, asset.id)
     } else {
       db.prepare(
-        `UPDATE assets SET status = ?, condition = ?, assigned_employee_id = NULL, updated_at = ?
-         WHERE id = ?`
+        `UPDATE assets SET status = ?, condition = ?, assigned_employee_id = NULL,
+           allocation_type = 'none', updated_at = ? WHERE id = ?`
       ).run(nextStatus, nextCondition, now, asset.id)
     }
   })
