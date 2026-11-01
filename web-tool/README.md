@@ -7,7 +7,7 @@ Trang tĩnh (HTML/CSS/JS thuần, không build) giúp máy khác **không cần 
 1. Người dùng mở trang, bấm **Sao chép lệnh**.
 2. Dán lệnh vào PowerShell (Win + X → Terminal → Ctrl + V → Enter). Lệnh tải `scan.txt` từ chính trang này về bộ nhớ rồi chạy — **không tạo tệp `.bat`/`.ps1`** nên không bị Smart App Control chặn.
 3. Script quét cấu hình, in ra mã `MD1:...`, copy vào clipboard và mở sẵn trang kèm kết quả.
-4. Trang hiển thị bảng cấu hình, cho phép sửa tên/danh mục rồi thêm vào danh sách. Gom đủ máy thì **Xuất CSV**.
+4. Trang hiển thị bảng cấu hình, cho phép sửa tên/danh mục rồi thêm vào danh sách. Bấm **Sao chép mã** để mang các mã `MD1:` sang máy tổng hợp (xem mục dưới), sau đó **Xuất CSV** một lần.
 
 Dữ liệu chỉ nằm trong `localStorage` của trình duyệt. Không có máy chủ, không có analytics, không gửi dữ liệu đi đâu.
 
